@@ -1,0 +1,25 @@
+[project]
+name = "langchain-study"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain>=0.3.27",
+    "langchain-community>=0.3.27",
+    "langgraph>=0.5.4",
+    "langserve[all]>=0.3.1",
+    "langsmith>=0.4.8",
+    "python-dotenv>=1.1.1",
+    "spacy>=3.8.7",
+    "xinference-client>=1.8.0",
+    "pymilvus>=2.5.14",
+    "loguru>=0.7.3",
+    "langchain-litellm>=0.2.2",
+    "langchain-tavily>=0.2.11",
+    "tavily-python>=0.7.11",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.5",
+]
