@@ -1,13 +1,13 @@
 import inspect
 import sys
-from typing import Annotated, Optional, TypedDict
+import uuid
+from typing import Annotated, TypedDict
 
+import aiofiles
 from langchain.agents import Tool
 from langchain.tools import StructuredTool
 from langchain_core.tools import tool
 from langchain_litellm import ChatLiteLLM
-from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.constants import START
 from langgraph.graph import StateGraph, add_messages
@@ -17,11 +17,8 @@ from langgraph.types import interrupt
 from loguru import logger
 
 from configs import app_config
-from tools.base_tool import BaseTool
-from tools.message_tool import MessageTool
-from tools.task_list_tool import TaskListTool
+from tools.tool_manager import ToolManager
 from tools.tool_registry import ToolRegistry
-from tools.web_search_tool import SandboxWebSearchTool
 from utils.current_date import get_current_date_info
 
 logger.remove()  # 先移除默认的控制台输出
@@ -30,17 +27,7 @@ logger.add(sys.stdout, level="INFO")
 tool_registry = ToolRegistry()
 
 
-def add_tool(tool_class: type[BaseTool], function_names: Optional[list[str]] = None, **kwargs):
-    """Add a tool to the ThreadManager."""
-    tool_registry.register_tool(tool_class, function_names, **kwargs)
-
-
-add_tool(MessageTool)
-add_tool(TaskListTool, thread_id="1")
-add_tool(SandboxWebSearchTool)
-
-
-def get_core_tools() -> list[Tool]:
+def get_tools() -> list[Tool]:
     functions = tool_registry.get_available_functions()
     tools = []
 
@@ -66,14 +53,6 @@ def get_core_tools() -> list[Tool]:
     return tools
 
 
-llm = ChatLiteLLM(
-    model=app_config.model_name,
-    api_base=app_config.base_url,
-    api_key=app_config.api_key,
-    custom_llm_provider="openai",
-)
-
-
 @tool
 def human_assistance(query: str) -> str:
     """Request assistance from a human."""
@@ -84,8 +63,20 @@ def human_assistance(query: str) -> str:
 # llm = ChatOpenAI(model="Qwen/Qwen3-14B", base_url=app_config.base_url, api_key=app_config.api_key)
 # tool = TavilySearch(tavily_api_key=app_config.tavily_api_key, max_results=app_config.max_results)
 # tools = [tool, human_assistance] + get_core_tools()
-tools = get_core_tools()
-llm_with_tools = llm.bind_tools(tools)
+
+
+def get_llm():
+    llm = ChatLiteLLM(
+        model=app_config.model_name,
+        api_base=app_config.base_url,
+        api_key=app_config.api_key,
+        custom_llm_provider="openai",
+    )
+
+    tools = get_tools()
+    llm_with_tools = llm.bind_tools(tools)
+
+    return llm_with_tools
 
 
 class State(TypedDict):
@@ -93,14 +84,15 @@ class State(TypedDict):
 
 
 def chatbot(state: State):
-    return {"messages": [llm_with_tools.invoke(state["messages"])]}
+    llm = get_llm()
+    return {"messages": [llm.invoke(state["messages"])]}
 
 
 def get_graph(checkpointer) -> CompiledStateGraph:
     graph_builder = StateGraph(State)
     graph_builder.add_node("chatbot", chatbot)
 
-    tool_node = ToolNode(tools=tools)
+    tool_node = ToolNode(tools=get_tools())
     graph_builder.add_node("tools", tool_node)
 
     graph_builder.add_conditional_edges(
@@ -115,15 +107,24 @@ def get_graph(checkpointer) -> CompiledStateGraph:
     return graph
 
 
-def get_system_prompt() -> str:
-    with open("prompt.md", encoding="utf-8") as f:
-        content = f.read()
+async def get_system_prompt() -> str:
+    async with aiofiles.open("prompt.md", encoding="utf-8") as f:
+        content = await f.read()
 
     return content
 
 
+def setup_tools(tool_manager: ToolManager):
+    tool_manager.register_all_tools()
+
+
 async def stream_graph_updates(user_input: str, config):
-    system_prompt = get_system_prompt().replace("{{current_date}}", get_current_date_info())
+    system_prompt = await get_system_prompt()
+    system_prompt = system_prompt.replace("{{current_date}}", get_current_date_info())
+
+    tool_manager = ToolManager(tool_registry=tool_registry, thread_id=config["configurable"]["thread_id"])
+    setup_tools(tool_manager)
+
     async with AsyncPostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
         graph = get_graph(checkpointer)
 
@@ -143,7 +144,8 @@ if __name__ == "__main__":
 
     async def run():
         user_input = "今天是几号，今天福州和厦门的温度谁更高"
-        config = {"configurable": {"thread_id": "1"}}
+        thread_id = str(uuid.uuid4())
+        config = {"configurable": {"thread_id": thread_id}}
 
         await stream_graph_updates(user_input, config)
 
