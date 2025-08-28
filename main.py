@@ -7,6 +7,8 @@ from langchain.tools import StructuredTool
 from langchain_core.tools import tool
 from langchain_litellm import ChatLiteLLM
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.constants import START
 from langgraph.graph import StateGraph, add_messages
 from langgraph.graph.state import CompiledStateGraph
@@ -94,7 +96,7 @@ def chatbot(state: State):
     return {"messages": [llm_with_tools.invoke(state["messages"])]}
 
 
-def get_graph() -> CompiledStateGraph:
+def get_graph(checkpointer) -> CompiledStateGraph:
     graph_builder = StateGraph(State)
     graph_builder.add_node("chatbot", chatbot)
 
@@ -109,8 +111,7 @@ def get_graph() -> CompiledStateGraph:
     graph_builder.add_edge("tools", "chatbot")
     graph_builder.add_edge(START, "chatbot")
 
-    memory = InMemorySaver()
-    graph = graph_builder.compile(checkpointer=memory)
+    graph = graph_builder.compile(checkpointer=checkpointer)
     return graph
 
 
@@ -123,19 +124,22 @@ def get_system_prompt() -> str:
 
 async def stream_graph_updates(user_input: str, config):
     system_prompt = get_system_prompt().replace("{{current_date}}", get_current_date_info())
-    graph = get_graph()
+    async with AsyncPostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
+        graph = get_graph(checkpointer)
 
-    async for event in graph.astream(
-        {"messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_input}]},
-        config,
-        stream_mode="values",
-    ):
-        if "messages" in event:
-            logger.info(event["messages"][-1].pretty_print())
+        async for event in graph.astream(
+            {"messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_input}]},
+            config,
+            stream_mode="values",
+        ):
+            if "messages" in event:
+                logger.info(event["messages"][-1].pretty_print())
 
 
 if __name__ == "__main__":
     import asyncio
+
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     async def run():
         user_input = "今天是几号，今天福州和厦门的温度谁更高"

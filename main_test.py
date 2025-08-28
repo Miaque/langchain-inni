@@ -2,8 +2,10 @@ import unittest
 
 from langchain_core.tools import Tool
 from langchain_text_splitters import SpacyTextSplitter
+from langgraph.checkpoint.postgres import PostgresSaver
 from loguru import logger
 
+from configs import app_config
 from main import tool_registry
 
 
@@ -28,6 +30,13 @@ class LLMTest(unittest.TestCase):
             params = tool_registry.get_tool(name)["schema"].schema["function"]["parameters"]
             tool = Tool(name=name, func=func, description=desc, args_schema=params)
             logger.info(tool)
+
+    def test_init(self):
+        DB_URI = app_config.SQLALCHEMY_DATABASE_URI
+        logger.info(DB_URI)
+
+        with PostgresSaver.from_conn_string(DB_URI) as checkpointer:
+            checkpointer.setup()
 
 
 
