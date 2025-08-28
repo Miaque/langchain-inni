@@ -1,0 +1,14 @@
+{
+    "terminal.integrated.env.windows": {
+        "PYTHONPATH": "${workspaceFolder}",
+    },
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}"
+    ],
+    "python.analysis.indexing": true,
+    "python.analysis.packageIndexDepths": [["", 20, true]],
+    "files.exclude": {
+        "**/__pycache__": true,
+        ".idea": true,
+    },
+}
