@@ -6,6 +6,7 @@ from langchain_tavily import TavilySearch
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.constants import START
 from langgraph.graph import StateGraph, add_messages
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import interrupt
 from loguru import logger
@@ -48,18 +49,6 @@ llm = ChatLiteLLM(
     api_key=app_config.api_key,
     custom_llm_provider="openai",
 )
-# llm = ChatOpenAI(model="Qwen/Qwen3-14B", base_url=app_config.base_url, api_key=app_config.api_key)
-
-
-class State(TypedDict):
-    messages: Annotated[list, add_messages]
-
-
-graph_builder = StateGraph(State)
-
-
-def chatbot(state: State):
-    return {"messages": [llm.invoke(state["messages"])]}
 
 
 @tool
@@ -69,26 +58,38 @@ def human_assistance(query: str) -> str:
     return human_response["data"]
 
 
+# llm = ChatOpenAI(model="Qwen/Qwen3-14B", base_url=app_config.base_url, api_key=app_config.api_key)
 tool = TavilySearch(tavily_api_key=app_config.tavily_api_key, max_results=app_config.max_results)
 tools = [tool, human_assistance] + get_core_tools()
 llm_with_tools = llm.bind_tools(tools)
 
 
-graph_builder.add_node("chatbot", chatbot)
+class State(TypedDict):
+    messages: Annotated[list, add_messages]
 
-tool_node = ToolNode(tools=tools)
-graph_builder.add_node("tools", tool_node)
 
-graph_builder.add_conditional_edges(
-    "chatbot",
-    tools_condition,
-)
+def chatbot(state: State):
+    return {"messages": [llm_with_tools.invoke(state["messages"])]}
 
-graph_builder.add_edge("tools", "chatbot")
-graph_builder.add_edge(START, "chatbot")
 
-memory = InMemorySaver()
-graph = graph_builder.compile(checkpointer=memory)
+def get_graph() -> CompiledStateGraph:
+    graph_builder = StateGraph(State)
+    graph_builder.add_node("chatbot", chatbot)
+
+    tool_node = ToolNode(tools=tools)
+    graph_builder.add_node("tools", tool_node)
+
+    graph_builder.add_conditional_edges(
+        "chatbot",
+        tools_condition,
+    )
+
+    graph_builder.add_edge("tools", "chatbot")
+    graph_builder.add_edge(START, "chatbot")
+
+    memory = InMemorySaver()
+    graph = graph_builder.compile(checkpointer=memory)
+    return graph
 
 
 def get_system_prompt() -> str:
@@ -98,9 +99,11 @@ def get_system_prompt() -> str:
     return content
 
 
-def stream_graph_updates(user_input: str, config):
+async def stream_graph_updates(user_input: str, config):
     system_prompt = get_system_prompt()
-    for event in graph.stream(
+    graph = get_graph()
+
+    async for event in graph.astream(
         {"messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_input}]},
         config,
         stream_mode="values",
@@ -112,13 +115,10 @@ def stream_graph_updates(user_input: str, config):
 if __name__ == "__main__":
     import asyncio
 
-    async def test():
+    async def run():
         user_input = "今天厦门和福州的温度谁更高"
         config = {"configurable": {"thread_id": "1"}}
 
-        stream_graph_updates(user_input, config)
+        await stream_graph_updates(user_input, config)
 
-        snapshot = graph.get_state(config)
-        logger.info(snapshot)
-
-    asyncio.run(test())
+    asyncio.run(run())
