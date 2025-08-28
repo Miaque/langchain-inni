@@ -1,11 +1,10 @@
 import asyncio
 import datetime
 import json
-import logging
-import os
 
 import httpx
 from dotenv import load_dotenv
+from loguru import logger
 from tavily import AsyncTavilyClient
 
 from configs import app_config
@@ -97,7 +96,7 @@ class SandboxWebSearchTool(BaseTool):
                 num_results = 20
 
             # Execute the search with Tavily
-            logging.info(f"Executing web search for query: '{query}' with {num_results} results")
+            logger.info(f"Executing web search for query: '{query}' with {num_results} results")
             search_response = await self.tavily_client.search(
                 query=query,
                 max_results=num_results,
@@ -112,19 +111,19 @@ class SandboxWebSearchTool(BaseTool):
 
             # Return the complete Tavily response
             # This includes the query, answer, results, images and more
-            logging.info(f"Retrieved search results for query: '{query}' with answer and {len(results)} results")
+            logger.info(f"Retrieved search results for query: '{query}' with answer and {len(results)} results")
 
             # Consider search successful if we have either results OR an answer
             if len(results) > 0 or (answer and answer.strip()):
                 return ToolResult(success=True, output=json.dumps(search_response, ensure_ascii=False))
             else:
                 # No results or answer found
-                logging.warning(f"No search results or answer found for query: '{query}'")
+                logger.warning(f"No search results or answer found for query: '{query}'")
                 return ToolResult(success=False, output=json.dumps(search_response, ensure_ascii=False))
 
         except Exception as e:
             error_message = str(e)
-            logging.error(f"Error performing web search for '{query}': {error_message}")
+            logger.error(f"Error performing web search for '{query}': {error_message}")
             simplified_message = f"Error performing web search: {error_message[:200]}"
             if len(error_message) > 200:
                 simplified_message += "..."
@@ -167,27 +166,27 @@ class SandboxWebSearchTool(BaseTool):
         - urls: Multiple URLs to scrape, separated by commas
         """
         try:
-            logging.info(f"Starting to scrape webpages: {urls}")
+            logger.info(f"Starting to scrape webpages: {urls}")
 
             # Ensure sandbox is initialized
             await self._ensure_sandbox()
 
             # Parse the URLs parameter
             if not urls:
-                logging.warning("Scrape attempt with empty URLs")
+                logger.warning("Scrape attempt with empty URLs")
                 return self.fail_response("Valid URLs are required.")
 
             # Split the URLs string into a list
             url_list = [url.strip() for url in urls.split(",") if url.strip()]
 
             if not url_list:
-                logging.warning("No valid URLs found in the input")
+                logger.warning("No valid URLs found in the input")
                 return self.fail_response("No valid URLs provided.")
 
             if len(url_list) == 1:
-                logging.warning("Only a single URL provided - for efficiency you should scrape multiple URLs at once")
+                logger.warning("Only a single URL provided - for efficiency you should scrape multiple URLs at once")
 
-            logging.info(f"Processing {len(url_list)} URLs: {url_list}")
+            logger.info(f"Processing {len(url_list)} URLs: {url_list}")
 
             # Process each URL concurrently and collect results
             tasks = [self._scrape_single_url(url) for url in url_list]
@@ -197,7 +196,7 @@ class SandboxWebSearchTool(BaseTool):
             processed_results = []
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
-                    logging.error(f"Error processing URL {url_list[i]}: {str(result)}")
+                    logger.error(f"Error processing URL {url_list[i]}: {str(result)}")
                     processed_results.append({"url": url_list[i], "success": False, "error": str(result)})
                 else:
                     processed_results.append(result)
@@ -231,7 +230,7 @@ class SandboxWebSearchTool(BaseTool):
 
         except Exception as e:
             error_message = str(e)
-            logging.error(f"Error in scrape_webpage: {error_message}")
+            logger.error(f"Error in scrape_webpage: {error_message}")
             return self.fail_response(f"Error processing scrape request: {error_message[:200]}")
 
     async def _scrape_single_url(self, url: str) -> dict:
@@ -242,13 +241,13 @@ class SandboxWebSearchTool(BaseTool):
         # # Add protocol if missing
         # if not (url.startswith('http://') or url.startswith('https://')):
         #     url = 'https://' + url
-        #     logging.info(f"Added https:// protocol to URL: {url}")
+        #     logger.info(f"Added https:// protocol to URL: {url}")
 
-        logging.info(f"Scraping single URL: {url}")
+        logger.info(f"Scraping single URL: {url}")
 
         try:
             # ---------- Firecrawl scrape endpoint ----------
-            logging.info(f"Sending request to Firecrawl for URL: {url}")
+            logger.info(f"Sending request to Firecrawl for URL: {url}")
             async with httpx.AsyncClient() as client:
                 headers = {
                     "Authorization": f"Bearer {self.firecrawl_api_key}",
@@ -263,7 +262,7 @@ class SandboxWebSearchTool(BaseTool):
 
                 while retry_count < max_retries:
                     try:
-                        logging.info(f"Sending request to Firecrawl (attempt {retry_count + 1}/{max_retries})")
+                        logger.info(f"Sending request to Firecrawl (attempt {retry_count + 1}/{max_retries})")
                         response = await client.post(
                             f"{self.firecrawl_url}/v2/scrape",
                             json=payload,
@@ -272,34 +271,34 @@ class SandboxWebSearchTool(BaseTool):
                         )
                         response.raise_for_status()
                         data = response.json()
-                        logging.info(f"Successfully received response from Firecrawl for {url}")
+                        logger.info(f"Successfully received response from Firecrawl for {url}")
                         break
                     except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ReadError) as timeout_err:
                         retry_count += 1
-                        logging.warning(f"Request timed out (attempt {retry_count}/{max_retries}): {str(timeout_err)}")
+                        logger.warning(f"Request timed out (attempt {retry_count}/{max_retries}): {str(timeout_err)}")
                         if retry_count >= max_retries:
                             raise Exception(
                                 f"Request timed out after {max_retries} attempts with {timeout_seconds}s timeout"
                             )
                         # Exponential backoff
-                        logging.info(f"Waiting {2**retry_count}s before retry")
+                        logger.info(f"Waiting {2**retry_count}s before retry")
                         await asyncio.sleep(2**retry_count)
                     except Exception as e:
                         # Don't retry on non-timeout errors
-                        logging.error(f"Error during scraping: {str(e)}")
+                        logger.error(f"Error during scraping: {str(e)}")
                         raise e
 
             # Format the response
             title = data.get("data", {}).get("metadata", {}).get("title", "")
             markdown_content = data.get("data", {}).get("markdown", "")
-            logging.info(f"Extracted content from {url}: title='{title}', content length={len(markdown_content)}")
+            logger.info(f"Extracted content from {url}: title='{title}', content length={len(markdown_content)}")
 
             formatted_result = {"title": title, "url": url, "text": markdown_content}
 
             # Add metadata if available
             if "metadata" in data.get("data", {}):
                 formatted_result["metadata"] = data["data"]["metadata"]
-                logging.info(f"Added metadata: {data['data']['metadata'].keys()}")
+                logger.info(f"Added metadata: {data['data']['metadata'].keys()}")
 
             # Create a simple filename from the URL domain and date
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -314,7 +313,7 @@ class SandboxWebSearchTool(BaseTool):
             domain = "".join([c if c.isalnum() else "_" for c in domain])
             safe_filename = f"{timestamp}_{domain}.json"
 
-            logging.info(f"Generated filename: {safe_filename}")
+            logger.info(f"Generated filename: {safe_filename}")
 
             # Save results to a file in the /workspace/scrape directory
             scrape_dir = f"{self.workspace_path}/scrape"
@@ -322,7 +321,7 @@ class SandboxWebSearchTool(BaseTool):
 
             results_file_path = f"{scrape_dir}/{safe_filename}"
             json_content = json.dumps(formatted_result, ensure_ascii=False, indent=2)
-            logging.info(f"Saving content to file: {results_file_path}, size: {len(json_content)} bytes")
+            logger.info(f"Saving content to file: {results_file_path}, size: {len(json_content)} bytes")
 
             await self.sandbox.fs.upload_file(
                 json_content.encode(),
@@ -339,7 +338,7 @@ class SandboxWebSearchTool(BaseTool):
 
         except Exception as e:
             error_message = str(e)
-            logging.error(f"Error scraping URL '{url}': {error_message}")
+            logger.error(f"Error scraping URL '{url}': {error_message}")
 
             # Create an error result
             return {"url": url, "success": False, "error": error_message}

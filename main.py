@@ -1,8 +1,11 @@
+import inspect
+import sys
 from typing import Annotated, Optional, TypedDict
 
-from langchain_core.tools import Tool, tool
+from langchain.agents import Tool
+from langchain.tools import StructuredTool
+from langchain_core.tools import tool
 from langchain_litellm import ChatLiteLLM
-from langchain_tavily import TavilySearch
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.constants import START
 from langgraph.graph import StateGraph, add_messages
@@ -16,6 +19,11 @@ from tools.base_tool import BaseTool
 from tools.message_tool import MessageTool
 from tools.task_list_tool import TaskListTool
 from tools.tool_registry import ToolRegistry
+from tools.web_search_tool import SandboxWebSearchTool
+from utils.current_date import get_current_date_info
+
+logger.remove()  # 先移除默认的控制台输出
+logger.add(sys.stdout, level="INFO")
 
 tool_registry = ToolRegistry()
 
@@ -27,6 +35,7 @@ def add_tool(tool_class: type[BaseTool], function_names: Optional[list[str]] = N
 
 add_tool(MessageTool)
 add_tool(TaskListTool, thread_id="1")
+add_tool(SandboxWebSearchTool)
 
 
 def get_core_tools() -> list[Tool]:
@@ -34,10 +43,22 @@ def get_core_tools() -> list[Tool]:
     tools = []
 
     for name, func in functions.items():
-        # Tool(name=,func=,description=)
         desc = tool_registry.get_tool(name)["schema"].schema["function"]["description"]
         params = tool_registry.get_tool(name)["schema"].schema["function"]["parameters"]
-        tool = Tool(name=name, func=func, description=desc, args_schema=params)
+        # tool = Tool(name=name, func=func, description=desc, args_schema=params)
+
+        # 创建 StructuredTool，支持异步函数
+        if inspect.iscoroutinefunction(func):
+            tool = StructuredTool.from_function(
+                func=func,
+                name=name,
+                description=desc,
+                args_schema=params,
+                coroutine=func,  # 指定异步函数
+            )
+        else:
+            tool = StructuredTool.from_function(func=func, name=name, description=desc, args_schema=params)
+
         tools.append(tool)
 
     return tools
@@ -59,8 +80,9 @@ def human_assistance(query: str) -> str:
 
 
 # llm = ChatOpenAI(model="Qwen/Qwen3-14B", base_url=app_config.base_url, api_key=app_config.api_key)
-tool = TavilySearch(tavily_api_key=app_config.tavily_api_key, max_results=app_config.max_results)
-tools = [tool, human_assistance] + get_core_tools()
+# tool = TavilySearch(tavily_api_key=app_config.tavily_api_key, max_results=app_config.max_results)
+# tools = [tool, human_assistance] + get_core_tools()
+tools = get_core_tools()
 llm_with_tools = llm.bind_tools(tools)
 
 
@@ -100,7 +122,7 @@ def get_system_prompt() -> str:
 
 
 async def stream_graph_updates(user_input: str, config):
-    system_prompt = get_system_prompt()
+    system_prompt = get_system_prompt().replace("{{current_date}}", get_current_date_info())
     graph = get_graph()
 
     async for event in graph.astream(
@@ -116,7 +138,7 @@ if __name__ == "__main__":
     import asyncio
 
     async def run():
-        user_input = "今天厦门和福州的温度谁更高"
+        user_input = "今天是几号，今天福州和厦门的温度谁更高"
         config = {"configurable": {"thread_id": "1"}}
 
         await stream_graph_updates(user_input, config)
