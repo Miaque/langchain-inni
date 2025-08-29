@@ -2,6 +2,7 @@ from typing import Optional
 
 from loguru import logger
 
+from configs import app_config
 from tools.base_tool import BaseTool
 from tools.message_tool import MessageTool
 from tools.task_list_tool import TaskListTool
@@ -112,7 +113,7 @@ class ToolManager:
 
     def _register_utility_tools(self, disabled_tools: list[str]):
         """Register utility and data provider tools."""
-        if config.RAPID_API_KEY and "data_providers_tool" not in disabled_tools:
+        if app_config.RAPID_API_KEY and "data_providers_tool" not in disabled_tools:
             self.add_tool(DataProvidersTool)
             logger.debug("Registered data_providers_tool")
 
@@ -122,6 +123,6 @@ class ToolManager:
             from agent.tools.browser_tool import BrowserTool
 
             self.add_tool(
-                BrowserTool, project_id=self.project_id, thread_id=self.thread_id, thread_manager=self.thread_manager
+                BrowserTool, thread_id=self.thread_id
             )
             logger.debug("Registered browser_tool")
