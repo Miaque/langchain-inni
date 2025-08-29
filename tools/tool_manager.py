@@ -4,7 +4,20 @@ from loguru import logger
 
 from configs import app_config
 from tools.base_tool import BaseTool
+from tools.browser_tool import BrowserTool
+from tools.data_providers_tool import DataProvidersTool
 from tools.message_tool import MessageTool
+from tools.sb_deploy_tool import SandboxDeployTool
+from tools.sb_expose_tool import SandboxExposeTool
+from tools.sb_files_tool import SandboxFilesTool
+from tools.sb_image_edit_tool import SandboxImageEditTool
+from tools.sb_presentation_outline_tool import SandboxPresentationOutlineTool
+from tools.sb_presentation_tool import SandboxPresentationTool
+from tools.sb_sheets_tool import SandboxSheetsTool
+from tools.sb_shell_tool import SandboxShellTool
+from tools.sb_upload_file_tool import SandboxUploadFileTool
+from tools.sb_vision_tool import SandboxVisionTool
+from tools.sb_web_dev_tool import SandboxWebDevTool
 from tools.task_list_tool import TaskListTool
 from tools.tool_registry import ToolRegistry
 from tools.web_search_tool import SandboxWebSearchTool
@@ -52,57 +65,57 @@ class ToolManager:
     def _register_sandbox_tools(self, disabled_tools: list[str]):
         """Register sandbox-related tools."""
         sandbox_tools = [
-            ("sb_shell_tool", SandboxShellTool, {"project_id": self.project_id, "thread_manager": self.thread_manager}),
-            ("sb_files_tool", SandboxFilesTool, {"project_id": self.project_id, "thread_manager": self.thread_manager}),
+            ("sb_shell_tool", SandboxShellTool, {"project_id": self.project_id}),
+            ("sb_files_tool", SandboxFilesTool, {"project_id": self.project_id}),
             (
                 "sb_deploy_tool",
                 SandboxDeployTool,
-                {"project_id": self.project_id, "thread_manager": self.thread_manager},
+                {"project_id": self.project_id},
             ),
             (
                 "sb_expose_tool",
                 SandboxExposeTool,
-                {"project_id": self.project_id, "thread_manager": self.thread_manager},
+                {"project_id": self.project_id},
             ),
             (
                 "web_search_tool",
                 SandboxWebSearchTool,
-                {"project_id": self.project_id, "thread_manager": self.thread_manager},
+                {"project_id": self.project_id},
             ),
             (
                 "sb_vision_tool",
                 SandboxVisionTool,
-                {"project_id": self.project_id, "thread_id": self.thread_id, "thread_manager": self.thread_manager},
+                {"project_id": self.project_id, "thread_id": self.thread_id},
             ),
             (
                 "sb_image_edit_tool",
                 SandboxImageEditTool,
-                {"project_id": self.project_id, "thread_id": self.thread_id, "thread_manager": self.thread_manager},
+                {"project_id": self.project_id, "thread_id": self.thread_id},
             ),
             (
                 "sb_presentation_outline_tool",
                 SandboxPresentationOutlineTool,
-                {"project_id": self.project_id, "thread_manager": self.thread_manager},
+                {"project_id": self.project_id},
             ),
             (
                 "sb_presentation_tool",
                 SandboxPresentationTool,
-                {"project_id": self.project_id, "thread_manager": self.thread_manager},
+                {"project_id": self.project_id},
             ),
             (
                 "sb_sheets_tool",
                 SandboxSheetsTool,
-                {"project_id": self.project_id, "thread_manager": self.thread_manager},
+                {"project_id": self.project_id},
             ),
             (
                 "sb_web_dev_tool",
                 SandboxWebDevTool,
-                {"project_id": self.project_id, "thread_id": self.thread_id, "thread_manager": self.thread_manager},
+                {"project_id": self.project_id, "thread_id": self.thread_id},
             ),
             (
                 "sb_upload_file_tool",
                 SandboxUploadFileTool,
-                {"project_id": self.project_id, "thread_manager": self.thread_manager},
+                {"project_id": self.project_id},
             ),
         ]
 
@@ -120,7 +133,6 @@ class ToolManager:
     def _register_browser_tool(self, disabled_tools: list[str]):
         """Register browser tool."""
         if "browser_tool" not in disabled_tools:
-            from agent.tools.browser_tool import BrowserTool
 
             self.add_tool(
                 BrowserTool, thread_id=self.thread_id
