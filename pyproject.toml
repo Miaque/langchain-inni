@@ -27,6 +27,8 @@ dependencies = [
     "chardet==5.2.0",
     "openpyxl==3.1.2",
     "structlog==25.4.0",
+    "peewee>=3.18.2",
+    "peewee-migrate>=1.13.0",
 ]
 
 [dependency-groups]

@@ -27,7 +27,7 @@ class Task(BaseModel):
     section_id: str  # Reference to section ID instead of section name
 
 
-class TaskListTool(BaseTool):
+class TaskListTool(SandboxToolsBase):
     """Task management system for organizing and tracking tasks. It contains the action plan for the agent to follow.
 
     Features:
@@ -36,9 +36,9 @@ class TaskListTool(BaseTool):
     - Organize tasks into logical sections and workflows
     - Track completion status and progress
     """
-
-    def __init__(self, thread_id: str):
-        super().__init__()
+    
+    def __init__(self, project_id: str, thread_manager, thread_id: str):
+        super().__init__(project_id, thread_manager)
         self.thread_id = thread_id
         self.task_list_message_type = "task_list"
 

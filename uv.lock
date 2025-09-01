@@ -969,6 +969,8 @@ dependencies = [
     { name = "langsmith" },
     { name = "loguru" },
     { name = "openpyxl" },
+    { name = "peewee" },
+    { name = "peewee-migrate" },
     { name = "psycopg", extra = ["binary", "pool"] },
     { name = "psycopg2-binary" },
     { name = "pymilvus" },
@@ -1001,6 +1003,8 @@ requires-dist = [
     { name = "langsmith", specifier = ">=0.4.8" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "openpyxl", specifier = "==3.1.2" },
+    { name = "peewee", specifier = ">=3.18.2" },
+    { name = "peewee-migrate", specifier = ">=1.13.0" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2.9" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "pymilvus", specifier = ">=2.5.14" },
@@ -1786,6 +1790,25 @@ wheels = [
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/15/d5/f0486090eb18dd8710bf60afeaf638ba6817047c0c8ae5c6a25598665609/pandas-2.3.2-cp313-cp313t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b37205ad6f00d52f16b6d09f406434ba928c1a1966e2771006a9033c736d30d2", size = 11883216, upload-time = "2025-08-21T10:27:59.302Z" },
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/10/86/692050c119696da19e20245bbd650d8dfca6ceb577da027c3a73c62a047e/pandas-2.3.2-cp313-cp313t-musllinux_1_2_aarch64.whl", hash = "sha256:837248b4fc3a9b83b9c6214699a13f069dc13510a6a6d7f9ba33145d2841a012", size = 12699743, upload-time = "2025-08-21T10:28:02.447Z" },
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/cd/d7/612123674d7b17cf345aad0a10289b2a384bff404e0463a83c4a3a59d205/pandas-2.3.2-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:d2c3554bd31b731cd6490d94a28f3abb8dd770634a9e06eb6d2911b9827db370", size = 13186141, upload-time = "2025-08-21T10:28:05.377Z" },
+]
+
+[[package]]
+name = "peewee"
+version = "3.18.2"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/04/89/76f6f1b744c8608e0d416b588b9d63c2a500ff800065ae610f7c80f532d6/peewee-3.18.2.tar.gz", hash = "sha256:77a54263eb61aff2ea72f63d2eeb91b140c25c1884148e28e4c0f7c4f64996a0", size = 949220, upload-time = "2025-07-08T12:52:03.941Z" }
+
+[[package]]
+name = "peewee-migrate"
+version = "1.13.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "peewee" },
+]
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c7/66/8d5ad45ea396623533a9cb2bbf78fdcc52efb65f7db058d7dc2523e1dd41/peewee_migrate-1.13.0.tar.gz", hash = "sha256:1ab67f72a0936006155e1b310c18a32f79e4dff3917cfeb10112ca92518721e5", size = 17119, upload-time = "2024-07-17T10:13:32.431Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/e8/f9/bf657b918756b0b15d85845b351c0074b1d953798b8c72c05b4a456baf06/peewee_migrate-1.13.0-py3-none-any.whl", hash = "sha256:66597f5b8549a8ff456915db60e8382daf7839eef79352027e7cf54feec56860", size = 19425, upload-time = "2024-07-17T10:13:29.255Z" },
 ]
 
 [[package]]

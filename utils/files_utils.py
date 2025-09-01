@@ -17,7 +17,7 @@ EXCLUDED_FILES = {
 EXCLUDED_DIRS = {"node_modules", ".next", "dist", "build", ".git"}
 
 # File extensions to exclude from operations
-EXCLUDED_EXT = {".ico", ".svg", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", ".db", ".sql"}
+EXCLUDED_EXT = {".ico", ".svg", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", ".storage", ".sql"}
 
 
 def should_exclude_file(rel_path: str) -> bool:

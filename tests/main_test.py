@@ -5,7 +5,7 @@ from langchain_text_splitters import SpacyTextSplitter
 from langgraph.checkpoint.postgres import PostgresSaver
 from loguru import logger
 
-from configs import app_config
+from configs import app_config, WORK_DIR
 from main import tool_registry
 
 
@@ -37,6 +37,9 @@ class LLMTest(unittest.TestCase):
 
         with PostgresSaver.from_conn_string(DB_URI) as checkpointer:
             checkpointer.setup()
+
+    def test_dir(self):
+        logger.info(WORK_DIR)
 
 
 

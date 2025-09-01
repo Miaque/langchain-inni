@@ -9,6 +9,7 @@ from langchain.agents import Tool
 from langchain.tools import StructuredTool
 from langchain_core.tools import tool
 from langchain_litellm import ChatLiteLLM
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.constants import START
 from langgraph.graph import StateGraph, add_messages
@@ -150,18 +151,15 @@ if __name__ == "__main__":
 
         await stream_graph_updates(user_input, config)
 
-    async def get_history_state():
+    def get_history_state():
         config = {"configurable": {"thread_id": "1", "checkpoint_id": "1f084048-2825-6f93-8004-484a5e04f341"}}
 
-        async with AsyncPostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
+        with PostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
             graph = get_graph(checkpointer)
 
             state = graph.get_state(config)
             logger.info(state)
-
-    async def arun():
-        loop = asyncio.get_running_loop()
-        with ThreadPoolExecutor() as pool:
-            await loop.run_in_executor(pool, get_history_state)
             
-    asyncio.run(get_history_state())
+    # asyncio.run(get_history_state())
+
+    get_history_state()
