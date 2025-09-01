@@ -1,9 +1,11 @@
 import asyncio
 import uuid
+from typing import Optional
 
 from daytona import AsyncSandbox
 from loguru import logger
 
+from thread_manager import ThreadManager
 from tools.base_tool import BaseTool
 from tools.sandbox.sandbox import create_sandbox, delete_sandbox, get_or_start_sandbox
 from utils.files_utils import clean_path
@@ -15,8 +17,10 @@ class SandboxToolsBase(BaseTool):
     # Class variable to track if sandbox URLs have been printed
     _urls_printed = False
 
-    def __init__(self):
+    def __init__(self, project_id: str, thread_manager: Optional[ThreadManager] = None):
         super().__init__()
+        self.project_id = project_id
+        self.thread_manager = thread_manager
         self.workspace_path = "/workspace"
         self._sandbox = None
         self._sandbox_id = None

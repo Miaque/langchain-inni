@@ -1,16 +1,17 @@
-from loguru import logger
-
-from sandbox.tool_base import SandboxToolsBase
-from utils.s3_upload_utils import upload_base64_image
-import asyncio
-import json
 import base64
 import io
+import json
 import traceback
-from PIL import Image
-from utils.config import config
+from typing import Optional
 
-from tools.base_tool import openapi_schema, usage_example, ToolResult
+from loguru import logger
+from PIL import Image
+
+from configs import app_config
+from thread_manager import ThreadManager
+from tools.base_tool import ToolResult, openapi_schema, usage_example
+from tools.sandbox.tool_base import SandboxToolsBase
+from utils.s3_upload_utils import upload_base64_image
 
 
 class BrowserTool(SandboxToolsBase):
@@ -27,8 +28,8 @@ class BrowserTool(SandboxToolsBase):
     - browser_screenshot: Take screenshots
     """
 
-    def __init__(self, project_id: str, thread_id: str):
-        super().__init__(project_id)
+    def __init__(self, project_id: str, thread_id: str, thread_manager: ThreadManager):
+        super().__init__(project_id, thread_manager)
         self.thread_id = thread_id
 
     def _validate_base64_image(self, base64_string: str, max_size_mb: int = 10) -> tuple[bool, str]:
@@ -151,7 +152,7 @@ class BrowserTool(SandboxToolsBase):
                         return True
                     else:
                         # If the browser api is not healthy, we need to restart the browser api
-                        model_api_key = config.GEMINI_API_KEY
+                        model_api_key = app_config.GEMINI_API_KEY
 
                         response = await self.sandbox.process.exec(
                             f"curl -X POST 'http://localhost:8004/api/init' -H 'Content-Type: application/json' -d '{{\"api_key\": \"{model_api_key}\"}}'",
@@ -174,7 +175,9 @@ class BrowserTool(SandboxToolsBase):
             logger.error(f"Error checking Stagehand API health: {e}")
             return False
 
-    async def _execute_stagehand_api(self, endpoint: str, params: dict = None, method: str = "POST") -> ToolResult:
+    async def _execute_stagehand_api(
+        self, endpoint: str, params: Optional[dict] = None, method: str = "POST"
+    ) -> ToolResult:
         """Execute a Stagehand action through the sandbox API"""
         try:
             # Ensure sandbox is initialized
@@ -373,7 +376,7 @@ class BrowserTool(SandboxToolsBase):
         </function_calls>
         """)
     async def browser_act(
-        self, action: str, variables: dict = None, iframes: bool = False, filePath: dict = None
+        self, action: str, variables: Optional[dict] = None, iframes: bool = False, filePath: Optional[dict] = None
     ) -> ToolResult:
         """Perform any browser action using Stagehand."""
         logger.debug(

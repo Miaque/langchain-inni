@@ -1,12 +1,14 @@
-from typing import Optional
-from agentpress.tool import ToolResult, openapi_schema, usage_example
-from sandbox.tool_base import SandboxToolsBase
-from agentpress.thread_manager import ThreadManager
-import httpx
-from io import BytesIO
-import uuid
-from litellm import aimage_generation, aimage_edit
 import base64
+import uuid
+from io import BytesIO
+from typing import Optional
+
+import httpx
+from litellm import aimage_edit, aimage_generation
+
+from thread_manager import ThreadManager
+from tools.base_tool import ToolResult, openapi_schema, usage_example
+from tools.sandbox.tool_base import SandboxToolsBase
 
 
 class SandboxImageEditTool(SandboxToolsBase):
@@ -95,9 +97,7 @@ class SandboxImageEditTool(SandboxToolsBase):
 
                 # Create BytesIO object with proper filename to set MIME type
                 image_io = BytesIO(image_bytes)
-                image_io.name = (
-                    "image.png"  # Set filename to ensure proper MIME type detection
-                )
+                image_io.name = "image.png"  # Set filename to ensure proper MIME type detection
 
                 response = await aimage_edit(
                     image=[image_io],  # Type in the LiteLLM SDK is wrong
@@ -119,9 +119,7 @@ class SandboxImageEditTool(SandboxToolsBase):
             )
 
         except Exception as e:
-            return self.fail_response(
-                f"An error occurred during image generation/editing: {str(e)}"
-            )
+            return self.fail_response(f"An error occurred during image generation/editing: {str(e)}")
 
     async def _get_image_bytes(self, image_path: str) -> bytes | ToolResult:
         """Get image bytes from URL or local file path."""
@@ -149,16 +147,12 @@ class SandboxImageEditTool(SandboxToolsBase):
             # Check if file exists and is not a directory
             file_info = await self.sandbox.fs.get_file_info(full_path)
             if file_info.is_dir:
-                return self.fail_response(
-                    f"Path '{cleaned_path}' is a directory, not an image file."
-                )
+                return self.fail_response(f"Path '{cleaned_path}' is a directory, not an image file.")
 
             return await self.sandbox.fs.download_file(full_path)
 
         except Exception as e:
-            return self.fail_response(
-                f"Could not read image file from sandbox: {image_path} - {str(e)}"
-            )
+            return self.fail_response(f"Could not read image file from sandbox: {image_path} - {str(e)}")
 
     async def _process_image_response(self, response) -> str | ToolResult:
         """Download generated image and save to sandbox with random name."""

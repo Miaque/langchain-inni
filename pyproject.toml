@@ -23,6 +23,10 @@ dependencies = [
     "aiofiles>=24.1.0",
     "daytona>=0.25.6",
     "daytona-sdk>=0.25.6",
+    "pytesseract>=0.3.13",
+    "chardet==5.2.0",
+    "openpyxl==3.1.2",
+    "structlog==25.4.0",
 ]
 
 [dependency-groups]

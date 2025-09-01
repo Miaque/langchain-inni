@@ -7,7 +7,6 @@ import uuid
 from datetime import datetime
 
 from loguru import logger
-from services.supabase import DBConnection
 
 
 async def upload_base64_image(base64_data: str, bucket_name: str = "browser-screenshots") -> str:

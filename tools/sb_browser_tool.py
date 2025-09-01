@@ -3,9 +3,10 @@ import io
 import json
 import traceback
 
-
 from PIL import Image
 from sandbox.tool_base import SandboxToolsBase
+
+from thread_manager import ThreadManager
 
 
 class SandboxBrowserTool(SandboxToolsBase):

@@ -2,23 +2,24 @@ from __future__ import annotations
 
 import csv
 import io
-import json
 from dataclasses import dataclass
 from io import BytesIO
 from statistics import mean
 from typing import Any, Dict, List, Optional, Tuple
 
 import chardet
-from agentpress.tool import ToolResult, openapi_schema, usage_example
-from sandbox.tool_base import SandboxToolsBase
-from utils.logger import logger
+from loguru import logger
+
+from thread_manager import ThreadManager
+from tools.base_tool import ToolResult, openapi_schema, usage_example
+from tools.sandbox.tool_base import SandboxToolsBase
 
 try:
     import openpyxl
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment
-    from openpyxl.chart import BarChart, LineChart, PieChart, Reference, Series, ScatterChart
+    from openpyxl.chart import BarChart, LineChart, PieChart, Reference, ScatterChart, Series
     from openpyxl.formatting.rule import ColorScaleRule
+    from openpyxl.styles import Alignment, Font, PatternFill
 except Exception:
     openpyxl = None
 
@@ -30,7 +31,7 @@ class SheetData:
 
 
 class SandboxSheetsTool(SandboxToolsBase):
-    def __init__(self, project_id: str, thread_manager):
+    def __init__(self, project_id: str, thread_manager: ThreadManager):
         super().__init__(project_id, thread_manager)
 
     async def _file_exists(self, full_path: str) -> bool:
@@ -155,46 +156,56 @@ class SandboxSheetsTool(SandboxToolsBase):
                 detected = "number"
             elif date_like >= max(1, len(col_values) // 2):
                 detected = "date"
-            types[headers[i] if i < len(headers) else f"col_{i+1}"] = detected
+            types[headers[i] if i < len(headers) else f"col_{i + 1}"] = detected
         return types
 
     def _to_index_map(self, headers: List[str]) -> Dict[str, int]:
         return {h: i for i, h in enumerate(headers)}
 
-    @openapi_schema({
-        "type": "function",
-        "function": {
-            "name": "update_sheet",
-            "description": "Modify existing cells, rows, or columns (insert/delete/update).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string"},
-                    "sheet_name": {"type": "string", "nullable": True},
-                    "operations": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "type": {"type": "string", "enum": [
-                                    "update_cell", "update_row", "insert_row", "delete_row", "insert_column", "delete_column"
-                                ]},
-                                "row_index": {"type": "integer"},
-                                "column": {"type": "string"},
-                                "column_index": {"type": "integer"},
-                                "values": {"type": "array", "items": {"type": "string"}},
-                                "value": {"type": "string"}
+    @openapi_schema(
+        {
+            "type": "function",
+            "function": {
+                "name": "update_sheet",
+                "description": "Modify existing cells, rows, or columns (insert/delete/update).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string"},
+                        "sheet_name": {"type": "string", "nullable": True},
+                        "operations": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "update_cell",
+                                            "update_row",
+                                            "insert_row",
+                                            "delete_row",
+                                            "insert_column",
+                                            "delete_column",
+                                        ],
+                                    },
+                                    "row_index": {"type": "integer"},
+                                    "column": {"type": "string"},
+                                    "column_index": {"type": "integer"},
+                                    "values": {"type": "array", "items": {"type": "string"}},
+                                    "value": {"type": "string"},
+                                },
+                                "required": ["type"],
                             },
-                            "required": ["type"]
-                        }
+                        },
+                        "save_as": {"type": "string", "description": "Optional path to save result (.csv or .xlsx)"},
                     },
-                    "save_as": {"type": "string", "description": "Optional path to save result (.csv or .xlsx)"}
+                    "required": ["file_path", "operations"],
                 },
-                "required": ["file_path", "operations"]
-            }
+            },
         }
-    })
-    @usage_example('''
+    )
+    @usage_example("""
         <function_calls>
         <invoke name="update_sheet">
           <parameter name="file_path">employee_details.xlsx</parameter>
@@ -206,8 +217,14 @@ class SandboxSheetsTool(SandboxToolsBase):
           ]</parameter>
         </invoke>
         </function_calls>
-    ''')
-    async def update_sheet(self, file_path: str, operations: List[Dict[str, Any]], sheet_name: Optional[str] = None, save_as: Optional[str] = None) -> ToolResult:
+    """)
+    async def update_sheet(
+        self,
+        file_path: str,
+        operations: List[Dict[str, Any]],
+        sheet_name: Optional[str] = None,
+        save_as: Optional[str] = None,
+    ) -> ToolResult:
         try:
             await self._ensure_sandbox()
             rel = self.clean_path(file_path)
@@ -312,20 +329,29 @@ class SandboxSheetsTool(SandboxToolsBase):
 
                 out = BytesIO()
                 wb.save(out)
-                await self._upload_bytes(full_path if not save_as else f"{self.workspace_path}/{self.clean_path(save_as)}", out.getvalue())
+                await self._upload_bytes(
+                    full_path if not save_as else f"{self.workspace_path}/{self.clean_path(save_as)}", out.getvalue()
+                )
                 try:
                     csv_full = f"{(full_path if not save_as else f'{self.workspace_path}/{self.clean_path(save_as)}').rsplit('.', 1)[0]}.csv"
                     from csv import writer as csv_writer
+
                     csv_buf = io.StringIO()
                     w = csv_writer(csv_buf)
                     for r in ws.iter_rows(values_only=True):
                         w.writerow(list(r))
-                    await self._upload_bytes(csv_full, csv_buf.getvalue().encode('utf-8'))
+                    await self._upload_bytes(csv_full, csv_buf.getvalue().encode("utf-8"))
                 except Exception:
                     pass
 
-                saved_path = (save_as or file_path)
-                return self.success_response({"updated": f"{self.workspace_path}/{self.clean_path(saved_path)}", "headers": [ws.cell(row=1, column=c).value for c in range(1, (ws.max_column or 0)+1)], "row_count": ws.max_row})
+                saved_path = save_as or file_path
+                return self.success_response(
+                    {
+                        "updated": f"{self.workspace_path}/{self.clean_path(saved_path)}",
+                        "headers": [ws.cell(row=1, column=c).value for c in range(1, (ws.max_column or 0) + 1)],
+                        "row_count": ws.max_row,
+                    }
+                )
 
             full_path, sheet = await self._load_sheet(file_path, sheet_name)
 
@@ -396,7 +422,7 @@ class SandboxSheetsTool(SandboxToolsBase):
                     c_idx = resolve_col(op)
                     if c_idx is None:
                         c_idx = len(headers)
-                    new_header = op.get("column", f"col_{c_idx+1}")
+                    new_header = op.get("column", f"col_{c_idx + 1}")
                     if not headers:
                         headers = [new_header]
                     else:
@@ -425,29 +451,33 @@ class SandboxSheetsTool(SandboxToolsBase):
 
             target_path = save_as or file_path
             saved_path = await self._save_sheet(target_path, sheet, sheet_name)
-            return self.success_response({"updated": saved_path, "row_count": len(sheet.rows), "headers": sheet.headers})
+            return self.success_response(
+                {"updated": saved_path, "row_count": len(sheet.rows), "headers": sheet.headers}
+            )
         except Exception as e:
             logger.exception("update_sheet failed")
             return self.fail_response(f"Error updating sheet: {e}")
 
-    @openapi_schema({
-        "type": "function",
-        "function": {
-            "name": "view_sheet",
-            "description": "Read headers, types, and sample rows; optional CSV export.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string"},
-                    "sheet_name": {"type": "string", "nullable": True},
-                    "max_rows": {"type": "integer", "default": 100},
-                    "export_csv_path": {"type": "string"}
+    @openapi_schema(
+        {
+            "type": "function",
+            "function": {
+                "name": "view_sheet",
+                "description": "Read headers, types, and sample rows; optional CSV export.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string"},
+                        "sheet_name": {"type": "string", "nullable": True},
+                        "max_rows": {"type": "integer", "default": 100},
+                        "export_csv_path": {"type": "string"},
+                    },
+                    "required": ["file_path"],
                 },
-                "required": ["file_path"]
-            }
+            },
         }
-    })
-    @usage_example('''
+    )
+    @usage_example("""
         <function_calls>
         <invoke name="view_sheet">
           <parameter name="file_path">reports/sales.xlsx</parameter>
@@ -456,8 +486,14 @@ class SandboxSheetsTool(SandboxToolsBase):
           <parameter name="export_csv_path">reports/sales_preview.csv</parameter>
         </invoke>
         </function_calls>
-    ''')
-    async def view_sheet(self, file_path: str, sheet_name: Optional[str] = None, max_rows: int = 100, export_csv_path: Optional[str] = None) -> ToolResult:
+    """)
+    async def view_sheet(
+        self,
+        file_path: str,
+        sheet_name: Optional[str] = None,
+        max_rows: int = 100,
+        export_csv_path: Optional[str] = None,
+    ) -> ToolResult:
         try:
             await self._ensure_sandbox()
             full_path, sheet = await self._load_sheet(file_path, sheet_name)
@@ -470,36 +506,40 @@ class SandboxSheetsTool(SandboxToolsBase):
                 await self._upload_bytes(export_full, self._write_csv_bytes(sheet))
                 exported_to = export_full
             sample_rows = sheet.rows[: max(0, max_rows)]
-            return self.success_response({
-                "file_path": full_path,
-                "headers": sheet.headers,
-                "row_count": len(sheet.rows),
-                "sample_rows": sample_rows,
-                "exported_csv": exported_to
-            })
+            return self.success_response(
+                {
+                    "file_path": full_path,
+                    "headers": sheet.headers,
+                    "row_count": len(sheet.rows),
+                    "sample_rows": sample_rows,
+                    "exported_csv": exported_to,
+                }
+            )
         except Exception as e:
             logger.exception("view_sheet failed")
             return self.fail_response(f"Error viewing sheet: {e}")
 
-    @openapi_schema({
-        "type": "function",
-        "function": {
-            "name": "create_sheet",
-            "description": "Create a new CSV/XLSX with optional headers/rows.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string"},
-                    "headers": {"type": "array", "items": {"type": "string"}},
-                    "rows": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}},
-                    "sheet_name": {"type": "string", "nullable": True},
-                    "overwrite": {"type": "boolean", "default": False}
+    @openapi_schema(
+        {
+            "type": "function",
+            "function": {
+                "name": "create_sheet",
+                "description": "Create a new CSV/XLSX with optional headers/rows.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string"},
+                        "headers": {"type": "array", "items": {"type": "string"}},
+                        "rows": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}},
+                        "sheet_name": {"type": "string", "nullable": True},
+                        "overwrite": {"type": "boolean", "default": False},
+                    },
+                    "required": ["file_path"],
                 },
-                "required": ["file_path"]
-            }
+            },
         }
-    })
-    @usage_example('''
+    )
+    @usage_example("""
         <function_calls>
         <invoke name="create_sheet">
           <parameter name="file_path">data/sample.csv</parameter>
@@ -508,8 +548,15 @@ class SandboxSheetsTool(SandboxToolsBase):
           <parameter name="overwrite">true</parameter>
         </invoke>
         </function_calls>
-    ''')
-    async def create_sheet(self, file_path: str, headers: Optional[List[str]] = None, rows: Optional[List[List[Any]]] = None, sheet_name: Optional[str] = None, overwrite: bool = False) -> ToolResult:
+    """)
+    async def create_sheet(
+        self,
+        file_path: str,
+        headers: Optional[List[str]] = None,
+        rows: Optional[List[List[Any]]] = None,
+        sheet_name: Optional[str] = None,
+        overwrite: bool = False,
+    ) -> ToolResult:
         try:
             await self._ensure_sandbox()
             rel = self.clean_path(file_path)
@@ -536,26 +583,31 @@ class SandboxSheetsTool(SandboxToolsBase):
             logger.exception("create_sheet failed")
             return self.fail_response(f"Error creating sheet: {e}")
 
-    @openapi_schema({
-        "type": "function",
-        "function": {
-            "name": "analyze_sheet",
-            "description": "Simple statistics and optional group_by; can export CSV.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string"},
-                    "sheet_name": {"type": "string", "nullable": True},
-                    "target_columns": {"type": "array", "items": {"type": "string"}},
-                    "group_by": {"type": "string"},
-                    "aggregations": {"type": "array", "items": {"type": "string", "enum": ["count", "sum", "avg", "min", "max"]}},
-                    "export_csv_path": {"type": "string"}
+    @openapi_schema(
+        {
+            "type": "function",
+            "function": {
+                "name": "analyze_sheet",
+                "description": "Simple statistics and optional group_by; can export CSV.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string"},
+                        "sheet_name": {"type": "string", "nullable": True},
+                        "target_columns": {"type": "array", "items": {"type": "string"}},
+                        "group_by": {"type": "string"},
+                        "aggregations": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": ["count", "sum", "avg", "min", "max"]},
+                        },
+                        "export_csv_path": {"type": "string"},
+                    },
+                    "required": ["file_path"],
                 },
-                "required": ["file_path"]
-            }
+            },
         }
-    })
-    @usage_example('''
+    )
+    @usage_example("""
         <function_calls>
         <invoke name="analyze_sheet">
           <parameter name="file_path">data/sales.csv</parameter>
@@ -564,8 +616,16 @@ class SandboxSheetsTool(SandboxToolsBase):
           <parameter name="export_csv_path">data/sales_summary.csv</parameter>
         </invoke>
         </function_calls>
-    ''')
-    async def analyze_sheet(self, file_path: str, sheet_name: Optional[str] = None, target_columns: Optional[List[str]] = None, group_by: Optional[str] = None, aggregations: Optional[List[str]] = None, export_csv_path: Optional[str] = None) -> ToolResult:
+    """)
+    async def analyze_sheet(
+        self,
+        file_path: str,
+        sheet_name: Optional[str] = None,
+        target_columns: Optional[List[str]] = None,
+        group_by: Optional[str] = None,
+        aggregations: Optional[List[str]] = None,
+        export_csv_path: Optional[str] = None,
+    ) -> ToolResult:
         try:
             await self._ensure_sandbox()
             full_path, sheet = await self._load_sheet(file_path, sheet_name)
@@ -607,13 +667,9 @@ class SandboxSheetsTool(SandboxToolsBase):
                         min_v = min(vals) if vals else None
                         max_v = max(vals) if vals else None
                         for agg in aggs:
-                            row_out.append({
-                                "count": count_v,
-                                "sum": sum_v,
-                                "avg": avg_v,
-                                "min": min_v,
-                                "max": max_v
-                            }[agg])
+                            row_out.append(
+                                {"count": count_v, "sum": sum_v, "avg": avg_v, "min": min_v, "max": max_v}[agg]
+                            )
                     summary_rows.append(row_out)
                 result_sheet = SheetData(headers=out_headers, rows=summary_rows)
             else:
@@ -665,36 +721,43 @@ class SandboxSheetsTool(SandboxToolsBase):
                 await self._upload_bytes(export_full, self._write_csv_bytes(result_sheet))
                 exported = export_full
 
-            return self.success_response({
-                "analyzed_from": full_path,
-                "result_preview": {"headers": result_sheet.headers, "rows": result_sheet.rows[:50]},
-                "exported_csv": exported
-            })
+            return self.success_response(
+                {
+                    "analyzed_from": full_path,
+                    "result_preview": {"headers": result_sheet.headers, "rows": result_sheet.rows[:50]},
+                    "exported_csv": exported,
+                }
+            )
         except Exception as e:
             logger.exception("analyze_sheet failed")
             return self.fail_response(f"Error analyzing sheet: {e}")
 
-    @openapi_schema({
-        "type": "function",
-        "function": {
-            "name": "visualize_sheet",
-            "description": "Generate charts (bar, line, pie, scatter) and save to XLSX. Also optionally export chart data to CSV for Google Sheets.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string"},
-                    "sheet_name": {"type": "string", "nullable": True},
-                    "chart_type": {"type": "string", "enum": ["bar", "line", "pie", "scatter"], "default": "bar"},
-                    "x_column": {"type": "string"},
-                    "y_columns": {"type": "array", "items": {"type": "string"}},
-                    "save_as": {"type": "string"},
-                    "export_csv_path": {"type": "string", "description": "Optional CSV path for the chart dataset (x + y columns)"}
+    @openapi_schema(
+        {
+            "type": "function",
+            "function": {
+                "name": "visualize_sheet",
+                "description": "Generate charts (bar, line, pie, scatter) and save to XLSX. Also optionally export chart data to CSV for Google Sheets.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string"},
+                        "sheet_name": {"type": "string", "nullable": True},
+                        "chart_type": {"type": "string", "enum": ["bar", "line", "pie", "scatter"], "default": "bar"},
+                        "x_column": {"type": "string"},
+                        "y_columns": {"type": "array", "items": {"type": "string"}},
+                        "save_as": {"type": "string"},
+                        "export_csv_path": {
+                            "type": "string",
+                            "description": "Optional CSV path for the chart dataset (x + y columns)",
+                        },
+                    },
+                    "required": ["file_path", "x_column", "y_columns"],
                 },
-                "required": ["file_path", "x_column", "y_columns"]
-            }
+            },
         }
-    })
-    @usage_example('''
+    )
+    @usage_example("""
         <function_calls>
         <invoke name="visualize_sheet">
           <parameter name="file_path">reports/sales.csv</parameter>
@@ -705,8 +768,17 @@ class SandboxSheetsTool(SandboxToolsBase):
           <parameter name="export_csv_path">reports/sales_chart_data.csv</parameter>
         </invoke>
         </function_calls>
-    ''')
-    async def visualize_sheet(self, file_path: str, x_column: str, y_columns: List[str], chart_type: str = "bar", sheet_name: Optional[str] = None, save_as: Optional[str] = None, export_csv_path: Optional[str] = None) -> ToolResult:
+    """)
+    async def visualize_sheet(
+        self,
+        file_path: str,
+        x_column: str,
+        y_columns: List[str],
+        chart_type: str = "bar",
+        sheet_name: Optional[str] = None,
+        save_as: Optional[str] = None,
+        export_csv_path: Optional[str] = None,
+    ) -> ToolResult:
         try:
             await self._ensure_sandbox()
             rel = self.clean_path(file_path)
@@ -795,43 +867,47 @@ class SandboxSheetsTool(SandboxToolsBase):
                 base = self.clean_path(target).rsplit(".", 1)[0]
                 csv_rel = f"{base}_data.csv"
             csv_full = f"{self.workspace_path}/{csv_rel}"
-            await self._upload_bytes(csv_full, self._write_csv_bytes(SheetData(headers=dataset_headers, rows=dataset_rows)))
+            await self._upload_bytes(
+                csv_full, self._write_csv_bytes(SheetData(headers=dataset_headers, rows=dataset_rows))
+            )
 
-            return self.success_response({
-                "source": full,
-                "chart_saved": target_full,
-                "chart_type": chart_type,
-                "chart_data_csv": csv_full
-            })
+            return self.success_response(
+                {"source": full, "chart_saved": target_full, "chart_type": chart_type, "chart_data_csv": csv_full}
+            )
         except Exception as e:
             logger.exception("visualize_sheet failed")
             return self.fail_response(f"Error visualizing sheet: {e}")
 
-    @openapi_schema({
-        "type": "function",
-        "function": {
-            "name": "format_sheet",
-            "description": "Style and format sheet cells (bold headers, auto widths, optional conditional formatting). XLSX only.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "file_path": {"type": "string"},
-                    "sheet_name": {"type": "string", "nullable": True},
-                    "bold_headers": {"type": "boolean", "default": True},
-                    "auto_width": {"type": "boolean", "default": True},
-                    "apply_banding": {"type": "boolean", "default": True},
-                    "conditional_format": {"type": "object", "properties": {
-                        "column": {"type": "string"},
-                        "min_color": {"type": "string", "default": "FFEFEB"},
-                        "mid_color": {"type": "string", "default": "FFD7D2"},
-                        "max_color": {"type": "string", "default": "FFA39E"}
-                    }}
+    @openapi_schema(
+        {
+            "type": "function",
+            "function": {
+                "name": "format_sheet",
+                "description": "Style and format sheet cells (bold headers, auto widths, optional conditional formatting). XLSX only.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {"type": "string"},
+                        "sheet_name": {"type": "string", "nullable": True},
+                        "bold_headers": {"type": "boolean", "default": True},
+                        "auto_width": {"type": "boolean", "default": True},
+                        "apply_banding": {"type": "boolean", "default": True},
+                        "conditional_format": {
+                            "type": "object",
+                            "properties": {
+                                "column": {"type": "string"},
+                                "min_color": {"type": "string", "default": "FFEFEB"},
+                                "mid_color": {"type": "string", "default": "FFD7D2"},
+                                "max_color": {"type": "string", "default": "FFA39E"},
+                            },
+                        },
+                    },
+                    "required": ["file_path"],
                 },
-                "required": ["file_path"]
-            }
+            },
         }
-    })
-    @usage_example('''
+    )
+    @usage_example("""
         <function_calls>
         <invoke name="format_sheet">
           <parameter name="file_path">reports/sales_chart.xlsx</parameter>
@@ -840,8 +916,16 @@ class SandboxSheetsTool(SandboxToolsBase):
           <parameter name="conditional_format">{"column":"revenue"}</parameter>
         </invoke>
         </function_calls>
-    ''')
-    async def format_sheet(self, file_path: str, sheet_name: Optional[str] = None, bold_headers: bool = True, auto_width: bool = True, apply_banding: bool = True, conditional_format: Optional[Dict[str, Any]] = None) -> ToolResult:
+    """)
+    async def format_sheet(
+        self,
+        file_path: str,
+        sheet_name: Optional[str] = None,
+        bold_headers: bool = True,
+        auto_width: bool = True,
+        apply_banding: bool = True,
+        conditional_format: Optional[Dict[str, Any]] = None,
+    ) -> ToolResult:
         try:
             await self._ensure_sandbox()
             rel = self.clean_path(file_path)
@@ -867,7 +951,9 @@ class SandboxSheetsTool(SandboxToolsBase):
                 for r in range(2, max_row + 1):
                     if r % 2 == 0:
                         for c in range(1, max_col + 1):
-                            ws.cell(row=r, column=c).fill = PatternFill(start_color="FFF9F9", end_color="FFF9F9", fill_type="solid")
+                            ws.cell(row=r, column=c).fill = PatternFill(
+                                start_color="FFF9F9", end_color="FFF9F9", fill_type="solid"
+                            )
 
             if auto_width:
                 for c in range(1, max_col + 1):
@@ -886,9 +972,15 @@ class SandboxSheetsTool(SandboxToolsBase):
                         rng = f"{openpyxl.utils.get_column_letter(c_idx)}2:{openpyxl.utils.get_column_letter(c_idx)}{max_row}"
                         ws.conditional_formatting.add(
                             rng,
-                            ColorScaleRule(start_type='min', start_color=conditional_format.get("min_color", "FFEFEB"),
-                                           mid_type='percentile', mid_value=50, mid_color=conditional_format.get("mid_color", "FFD7D2"),
-                                           end_type='max', end_color=conditional_format.get("max_color", "FFA39E"))
+                            ColorScaleRule(
+                                start_type="min",
+                                start_color=conditional_format.get("min_color", "FFEFEB"),
+                                mid_type="percentile",
+                                mid_value=50,
+                                mid_color=conditional_format.get("mid_color", "FFD7D2"),
+                                end_type="max",
+                                end_color=conditional_format.get("max_color", "FFA39E"),
+                            ),
                         )
 
             out = BytesIO()
@@ -897,4 +989,4 @@ class SandboxSheetsTool(SandboxToolsBase):
             return self.success_response({"formatted": full, "sheet": ws.title})
         except Exception as e:
             logger.exception("format_sheet failed")
-            return self.fail_response(f"Error formatting sheet: {e}") 
+            return self.fail_response(f"Error formatting sheet: {e}")

@@ -12,7 +12,7 @@ import json
 from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Union
+from typing import Any, Union
 
 from loguru import logger
 
@@ -30,11 +30,11 @@ class ToolSchema:
 
     Attributes:
         schema_type (SchemaType): Type of schema (OpenAPI)
-        schema (Dict[str, Any]): The actual schema definition
+        schema (dict[str, Any]): The actual schema definition
     """
 
     schema_type: SchemaType
-    schema: Dict[str, Any]
+    schema: dict[str, Any]
 
 
 @dataclass
@@ -57,7 +57,7 @@ class BaseTool(ABC):
     and result handling capabilities.
 
     Attributes:
-        _schemas (Dict[str, List[ToolSchema]]): Registered schemas for tool methods
+        _schemas (dict[str, list[ToolSchema]]): Registered schemas for tool methods
 
     Methods:
         get_schemas: Get all registered tool schemas
@@ -67,7 +67,7 @@ class BaseTool(ABC):
 
     def __init__(self):
         """Initialize tool with empty schema registry."""
-        self._schemas: Dict[str, List[ToolSchema]] = {}
+        self._schemas: dict[str, list[ToolSchema]] = {}
         logger.debug(f"Initializing tool class: {self.__class__.__name__}")
         self._register_schemas()
 
@@ -78,15 +78,15 @@ class BaseTool(ABC):
                 self._schemas[name] = method.tool_schemas
                 logger.debug(f"Registered schemas for method '{name}' in {self.__class__.__name__}")
 
-    def get_schemas(self) -> Dict[str, List[ToolSchema]]:
+    def get_schemas(self) -> dict[str, list[ToolSchema]]:
         """Get all registered tool schemas.
 
         Returns:
-            Dict mapping method names to their schema definitions
+            dict mapping method names to their schema definitions
         """
         return self._schemas
 
-    def success_response(self, data: Union[Dict[str, Any], str]) -> ToolResult:
+    def success_response(self, data: Union[dict[str, Any], str]) -> ToolResult:
         """Create a successful tool result.
 
         Args:
@@ -124,7 +124,7 @@ def _add_schema(func, schema: ToolSchema):
     return func
 
 
-def openapi_schema(schema: Dict[str, Any]):
+def openapi_schema(schema: dict[str, Any]):
     """Decorator for OpenAPI schema tools."""
 
     def decorator(func):
