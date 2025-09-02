@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, List, Optional, Type
+from collections.abc import Callable
+from typing import Any, Optional
 
 from loguru import logger
 
@@ -25,7 +26,7 @@ class ToolRegistry:
         self.tools = {}
         logger.debug("Initialized new ToolRegistry instance")
 
-    def register_tool(self, tool_class: Type[BaseTool], function_names: Optional[List[str]] = None, **kwargs):
+    def register_tool(self, tool_class: type[BaseTool], function_names: Optional[list[str]] = None, **kwargs):
         """Register a tool with optional function filtering.
 
         Args:
@@ -55,7 +56,7 @@ class ToolRegistry:
 
         logger.debug(f"Tool registration complete for {tool_class.__name__}: {registered_openapi} OpenAPI functions")
 
-    def get_available_functions(self) -> Dict[str, Callable]:
+    def get_available_functions(self) -> dict[str, Callable]:
         """Get all available tool functions.
 
         Returns:
@@ -73,7 +74,7 @@ class ToolRegistry:
         logger.debug(f"Retrieved {len(available_functions)} available functions")
         return available_functions
 
-    def get_tool(self, tool_name: str) -> Dict[str, Any]:
+    def get_tool(self, tool_name: str) -> dict[str, Any]:
         """Get a specific tool by name.
 
         Args:
@@ -87,7 +88,7 @@ class ToolRegistry:
             logger.warning(f"Tool not found: {tool_name}")
         return tool
 
-    def get_openapi_schemas(self) -> List[Dict[str, Any]]:
+    def get_openapi_schemas(self) -> list[dict[str, Any]]:
         """Get OpenAPI schemas for function calling.
 
         Returns:
@@ -101,7 +102,7 @@ class ToolRegistry:
         logger.debug(f"Retrieved {len(schemas)} OpenAPI schemas")
         return schemas
 
-    def get_usage_examples(self) -> Dict[str, str]:
+    def get_usage_examples(self) -> dict[str, str]:
         """Get usage examples for tools.
 
         Returns:

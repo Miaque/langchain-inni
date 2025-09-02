@@ -9,15 +9,15 @@ from tavily import AsyncTavilyClient
 
 from configs import app_config
 from thread_manager import ThreadManager
-from tools.base_tool import BaseTool, ToolResult, openapi_schema, usage_example
+from tools.base_tool import ToolResult, openapi_schema, usage_example
 from tools.sandbox.tool_base import SandboxToolsBase
-
 
 # TODO: add subpages, etc... in filters as sometimes its necessary
 
 
 class SandboxWebSearchTool(SandboxToolsBase):
     """Tool for performing web searches using Tavily API and web scraping using Firecrawl."""
+
     def __init__(self, project_id: str, thread_manager: ThreadManager):
         super().__init__(project_id, thread_manager)
         # Load environment variables

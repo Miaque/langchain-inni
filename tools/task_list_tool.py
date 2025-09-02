@@ -1,12 +1,14 @@
 import json
 import uuid
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from tools.base_tool import BaseTool, ToolResult, openapi_schema, usage_example
+from models.messages import Messages
+from tools.base_tool import ToolResult, openapi_schema, usage_example
+from tools.sandbox.tool_base import SandboxToolsBase
 
 
 class TaskStatus(str, Enum):
@@ -36,28 +38,19 @@ class TaskListTool(SandboxToolsBase):
     - Organize tasks into logical sections and workflows
     - Track completion status and progress
     """
-    
+
     def __init__(self, project_id: str, thread_manager, thread_id: str):
         super().__init__(project_id, thread_manager)
         self.thread_id = thread_id
         self.task_list_message_type = "task_list"
 
-    async def _load_data(self) -> tuple[List[Section], List[Task]]:
+    async def _load_data(self) -> tuple[list[Section], list[Task]]:
         """Load sections and tasks from storage"""
         try:
-            client = await self.thread_manager.db.client
-            result = (
-                await client.table("messages")
-                .select("*")
-                .eq("thread_id", self.thread_id)
-                .eq("type", self.task_list_message_type)
-                .order("created_at", desc=True)
-                .limit(1)
-                .execute()
-            )
+            result = Messages.get_last_message(self.thread_id, self.task_list_message_type)
 
-            if result.data and result.data[0].get("content"):
-                content = result.data[0]["content"]
+            if result and result.content:
+                content = result.content
                 if isinstance(content, str):
                     content = json.loads(content)
 
@@ -91,56 +84,36 @@ class TaskListTool(SandboxToolsBase):
             logger.error(f"Error loading data: {e}")
             return [], []
 
-    async def _save_data(self, sections: List[Section], tasks: List[Task]):
+    async def _save_data(self, sections: list[Section], tasks: list[Task]):
         """Save sections and tasks to storage"""
         try:
-            client = await self.thread_manager.db.client
-
             content = {
                 "sections": [section.model_dump() for section in sections],
                 "tasks": [task.model_dump() for task in tasks],
             }
 
             # Find existing message
-            result = (
-                await client.table("messages")
-                .select("message_id")
-                .eq("thread_id", self.thread_id)
-                .eq("type", self.task_list_message_type)
-                .order("created_at", desc=True)
-                .limit(1)
-                .execute()
-            )
+            message_id = Messages.get_last_message_id(self.thread_id, self.task_list_message_type)
 
-            if result.data:
+            if message_id:
                 # Update existing
-                await (
-                    client.table("messages")
-                    .update({"content": content})
-                    .eq("message_id", result.data[0]["message_id"])
-                    .execute()
-                )
+                Messages.update_content(message_id, content)
             else:
                 # Create new
-                await (
-                    client.table("messages")
-                    .insert(
-                        {
-                            "thread_id": self.thread_id,
-                            "type": self.task_list_message_type,
-                            "content": content,
-                            "is_llm_message": False,
-                            "metadata": {},
-                        }
-                    )
-                    .execute()
+                Messages.save_message(
+                    {
+                        "thread_id": self.thread_id,
+                        "type": self.task_list_message_type,
+                        "content": content,
+                        "is_llm_message": False,
+                        "meta_data": {},
+                    }
                 )
 
-        except Exception as e:
-            logger.error(f"Error saving data: {e}")
+        except Exception:
             raise
 
-    def _format_response(self, sections: List[Section], tasks: List[Task]) -> Dict[str, Any]:
+    def _format_response(self, sections: list[Section], tasks: list[Task]) -> dict[str, Any]:
         """Format data for response"""
         # Group display tasks by section
         section_map = {s.id: s for s in sections}
@@ -285,10 +258,10 @@ class TaskListTool(SandboxToolsBase):
     )
     async def create_tasks(
         self,
-        sections: Optional[List[Dict[str, Any]]] = None,
+        sections: Optional[list[dict[str, Any]]] = None,
         section_title: Optional[str] = None,
         section_id: Optional[str] = None,
-        task_contents: Optional[List[str]] = None,
+        task_contents: Optional[list[str]] = None,
     ) -> ToolResult:
         """Create tasks - supports both batch multi-section and single section creation"""
         try:

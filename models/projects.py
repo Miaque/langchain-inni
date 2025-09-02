@@ -1,10 +1,12 @@
 from datetime import datetime
+from typing import Optional
 
+from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy import TIMESTAMP, UUID, Boolean, Column, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from storage.db import Base
+from storage.db import Base, get_db
 
 
 class Project(Base):
@@ -30,3 +32,30 @@ class ProjectModel(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ProjectTable:
+    @staticmethod
+    def get_by_id(project_id: str) -> Optional[ProjectModel]:
+        try:
+            with get_db() as db:
+                project = db.query(Project).filter(Project.project_id == project_id).first()
+                return ProjectModel.model_validate(project)
+        except Exception as e:
+            logger.exception("Error getting project by id: ", exc_info=e)
+            return None
+
+    @staticmethod
+    def update_sandbox(project_id: str, sandbox: dict) -> bool:
+        try:
+            with get_db() as db:
+                result = db.query(Project).filter(Project.project_id == project_id).update({"sandbox": sandbox})
+                db.commit()
+
+                return True if result == 1 else False
+        except Exception as e:
+            logger.exception("Error updating sandbox: ", exc_info=e)
+            return False
+
+
+Projects = ProjectTable()

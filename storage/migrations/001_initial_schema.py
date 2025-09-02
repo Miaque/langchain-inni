@@ -61,12 +61,12 @@ def migrate_external(migrator: Migrator, database: pw.Database, *, fake=False):
 
     @migrator.create_model
     class Message(pw.Model):
-        id = pw.UUIDField(unique=True)
+        message_id = pw.UUIDField(unique=True)
         thread_id = pw.UUIDField(null=False)
         type = pw.CharField(null=False)
         is_llm_message = pw.BooleanField(null=False, default=True)
         content = pw_pext.BinaryJSONField(default={})
-        metadata = pw_pext.BinaryJSONField(default={})
+        meta_data = pw_pext.BinaryJSONField(default={})
         created_at = pw.TimestampField(null=False, default=datetime.now())
         updated_at = pw.TimestampField(null=False, default=datetime.now())
 

@@ -1,7 +1,6 @@
 import inspect
 import sys
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated, TypedDict
 
 import aiofiles
@@ -19,23 +18,23 @@ from langgraph.types import interrupt
 from loguru import logger
 
 from configs import app_config
+from thread_manager import ThreadManager
 from tools.tool_manager import ToolManager
-from tools.tool_registry import ToolRegistry
 from utils.current_date import get_current_date_info
 
 logger.remove()  # 先移除默认的控制台输出
 logger.add(sys.stdout, level="INFO")
 
-tool_registry = ToolRegistry()
+thread_manager = ThreadManager()
 
 
 def get_tools() -> list[Tool]:
-    functions = tool_registry.get_available_functions()
+    functions = thread_manager.tool_registry.get_available_functions()
     tools = []
 
     for name, func in functions.items():
-        desc = tool_registry.get_tool(name)["schema"].schema["function"]["description"]
-        params = tool_registry.get_tool(name)["schema"].schema["function"]["parameters"]
+        desc = thread_manager.tool_registry.get_tool(name)["schema"].schema["function"]["description"]
+        params = thread_manager.tool_registry.get_tool(name)["schema"].schema["function"]["parameters"]
         # tool = Tool(name=name, func=func, description=desc, args_schema=params)
 
         # 创建 StructuredTool，支持异步函数
@@ -116,16 +115,12 @@ async def get_system_prompt() -> str:
     return content
 
 
-def setup_tools(tool_manager: ToolManager):
-    tool_manager.register_all_tools()
-
-
 async def stream_graph_updates(user_input: str, config):
     system_prompt = await get_system_prompt()
     system_prompt = system_prompt.replace("{{current_date}}", get_current_date_info())
 
-    tool_manager = ToolManager(tool_registry=tool_registry, thread_id=config["configurable"]["thread_id"])
-    setup_tools(tool_manager)
+    tool_manager = ToolManager(thread_manager, "demo", config["configurable"]["thread_id"])
+    tool_manager.register_all_tools()
 
     async with AsyncPostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
         graph = get_graph(checkpointer)
@@ -144,22 +139,22 @@ if __name__ == "__main__":
 
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-    async def run():
-        user_input = "今天是几号，今天福州和厦门的温度谁更高"
+    async def arun():
+        user_input = "今天是几号，今天福州和厦门的温度谁更高，创建相关的任务"
         thread_id = str(uuid.uuid4())
         config = {"configurable": {"thread_id": thread_id}}
 
         await stream_graph_updates(user_input, config)
 
-    def get_history_state():
-        config = {"configurable": {"thread_id": "1", "checkpoint_id": "1f084048-2825-6f93-8004-484a5e04f341"}}
+    # def get_history_state():
+    #     config = {"configurable": {"thread_id": "1", "checkpoint_id": "1f084048-2825-6f93-8004-484a5e04f341"}}
+    #
+    #     with PostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
+    #         graph = get_graph(checkpointer)
+    #
+    #         state = graph.get_state(config)
+    #         logger.info(state)
 
-        with PostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
-            graph = get_graph(checkpointer)
+    asyncio.run(arun())
 
-            state = graph.get_state(config)
-            logger.info(state)
-            
-    # asyncio.run(get_history_state())
-
-    get_history_state()
+    # get_history_state()

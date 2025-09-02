@@ -5,6 +5,7 @@ from typing import Optional
 from daytona import AsyncSandbox
 from loguru import logger
 
+from models.projects import Projects
 from thread_manager import ThreadManager
 from tools.base_tool import BaseTool
 from tools.sandbox.sandbox import create_sandbox, delete_sandbox, get_or_start_sandbox
@@ -34,16 +35,12 @@ class SandboxToolsBase(BaseTool):
         """
         if self._sandbox is None:
             try:
-                # Get database client
-                client = await self.thread_manager.db.client
-
                 # Get project data
-                project = await client.table("projects").select("*").eq("project_id", self.project_id).execute()
-                if not project.data or len(project.data) == 0:
+                project = Projects.get_by_id(self.project_id)
+                if not project:
                     raise ValueError(f"Project {self.project_id} not found")
 
-                project_data = project.data[0]
-                sandbox_info = project_data.get("sandbox") or {}
+                sandbox_info = project.get("sandbox") or {}
 
                 # If there is no sandbox recorded for this project, create one lazily
                 if not sandbox_info.get("id"):
@@ -83,24 +80,18 @@ class SandboxToolsBase(BaseTool):
                         token = None
 
                     # Persist sandbox metadata to project record
-                    update_result = (
-                        await client.table("projects")
-                        .update(
-                            {
-                                "sandbox": {
-                                    "id": sandbox_id,
-                                    "pass": sandbox_pass,
-                                    "vnc_preview": vnc_url,
-                                    "sandbox_url": website_url,
-                                    "token": token,
-                                }
-                            }
-                        )
-                        .eq("project_id", self.project_id)
-                        .execute()
+                    update_result = Projects.update_sandbox(
+                        self.project_id,
+                        {
+                            "id": sandbox_id,
+                            "pass": sandbox_pass,
+                            "vnc_preview": vnc_url,
+                            "sandbox_url": website_url,
+                            "token": token,
+                        },
                     )
 
-                    if not update_result.data:
+                    if not update_result:
                         # Cleanup created sandbox if DB update failed
                         try:
                             await delete_sandbox(sandbox_id)

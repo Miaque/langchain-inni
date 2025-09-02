@@ -1,3 +1,5 @@
+from typing import Optional
+
 from daytona_sdk import (
     AsyncDaytona,
     AsyncSandbox,
@@ -88,7 +90,7 @@ async def start_supervisord_session(sandbox: AsyncSandbox):
         raise e
 
 
-async def create_sandbox(password: str, project_id: str = None) -> AsyncSandbox:
+async def create_sandbox(password: str, project_id: Optional[str] = None) -> AsyncSandbox:
     """Create a new sandbox with all required services configured and running."""
 
     logger.debug("Creating new Daytona sandbox environment")
@@ -132,7 +134,7 @@ async def create_sandbox(password: str, project_id: str = None) -> AsyncSandbox:
     # Start supervisord in a session for new sandbox
     await start_supervisord_session(sandbox)
 
-    logger.debug(f"Sandbox environment successfully initialized")
+    logger.debug("Sandbox environment successfully initialized")
     return sandbox
 
 
