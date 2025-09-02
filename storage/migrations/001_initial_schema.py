@@ -25,10 +25,10 @@ Some examples (model - class or model name)::
 """
 
 from contextlib import suppress
+from datetime import datetime
 
 import peewee as pw
 from peewee_migrate import Migrator
-
 
 with suppress(ImportError):
     import playhouse.postgres_ext as pw_pext
@@ -42,213 +42,41 @@ def migrate(migrator: Migrator, database: pw.Database, *, fake=False):
     # will require per-database SQL queries.
     # Instead, we assume that because external DB support was added at a later date, it is safe to assume a newer base
     # schema instead of trying to migrate from an older schema.
-    if isinstance(database, pw.SqliteDatabase):
-        migrate_sqlite(migrator, database, fake=fake)
-    else:
-        migrate_external(migrator, database, fake=fake)
-
-
-def migrate_sqlite(migrator: Migrator, database: pw.Database, *, fake=False):
-    @migrator.create_model
-    class Auth(pw.Model):
-        id = pw.CharField(max_length=255, unique=True)
-        email = pw.CharField(max_length=255)
-        password = pw.CharField(max_length=255)
-        active = pw.BooleanField()
-
-        class Meta:
-            table_name = "auth"
-
-    @migrator.create_model
-    class Chat(pw.Model):
-        id = pw.CharField(max_length=255, unique=True)
-        user_id = pw.CharField(max_length=255)
-        title = pw.CharField()
-        chat = pw.TextField()
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "chat"
-
-    @migrator.create_model
-    class ChatIdTag(pw.Model):
-        id = pw.CharField(max_length=255, unique=True)
-        tag_name = pw.CharField(max_length=255)
-        chat_id = pw.CharField(max_length=255)
-        user_id = pw.CharField(max_length=255)
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "chatidtag"
-
-    @migrator.create_model
-    class Document(pw.Model):
-        id = pw.AutoField()
-        collection_name = pw.CharField(max_length=255, unique=True)
-        name = pw.CharField(max_length=255, unique=True)
-        title = pw.CharField()
-        filename = pw.CharField()
-        content = pw.TextField(null=True)
-        user_id = pw.CharField(max_length=255)
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "document"
-
-    @migrator.create_model
-    class Modelfile(pw.Model):
-        id = pw.AutoField()
-        tag_name = pw.CharField(max_length=255, unique=True)
-        user_id = pw.CharField(max_length=255)
-        modelfile = pw.TextField()
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "modelfile"
-
-    @migrator.create_model
-    class Prompt(pw.Model):
-        id = pw.AutoField()
-        command = pw.CharField(max_length=255, unique=True)
-        user_id = pw.CharField(max_length=255)
-        title = pw.CharField()
-        content = pw.TextField()
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "prompt"
-
-    @migrator.create_model
-    class Tag(pw.Model):
-        id = pw.CharField(max_length=255, unique=True)
-        name = pw.CharField(max_length=255)
-        user_id = pw.CharField(max_length=255)
-        data = pw.TextField(null=True)
-
-        class Meta:
-            table_name = "tag"
-
-    @migrator.create_model
-    class User(pw.Model):
-        id = pw.CharField(max_length=255, unique=True)
-        name = pw.CharField(max_length=255)
-        email = pw.CharField(max_length=255)
-        role = pw.CharField(max_length=255)
-        profile_image_url = pw.CharField(max_length=255)
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "user"
+    migrate_external(migrator, database, fake=fake)
 
 
 def migrate_external(migrator: Migrator, database: pw.Database, *, fake=False):
     @migrator.create_model
-    class Auth(pw.Model):
-        id = pw.CharField(max_length=255, unique=True)
-        email = pw.CharField(max_length=255)
-        password = pw.TextField()
-        active = pw.BooleanField()
+    class Project(pw.Model):
+        project_id = pw.UUIDField(primary_key=True)
+        name = pw.CharField(null=False)
+        account_id = pw.UUIDField(null=False)
+        sandbox = pw_pext.BinaryJSONField(default={})
+        is_public = pw.BooleanField(default=False)
+        created_at = pw.TimestampField(null=False, default=datetime.now())
+        updated_at = pw.TimestampField(null=False, default=datetime.now())
 
         class Meta:
-            table_name = "auth"
+            table_name = "project"
 
     @migrator.create_model
-    class Chat(pw.Model):
-        id = pw.CharField(max_length=255, unique=True)
-        user_id = pw.CharField(max_length=255)
-        title = pw.TextField()
-        chat = pw.TextField()
-        timestamp = pw.BigIntegerField()
+    class Message(pw.Model):
+        id = pw.UUIDField(unique=True)
+        thread_id = pw.UUIDField(null=False)
+        type = pw.CharField(null=False)
+        is_llm_message = pw.BooleanField(null=False, default=True)
+        content = pw_pext.BinaryJSONField(default={})
+        metadata = pw_pext.BinaryJSONField(default={})
+        created_at = pw.TimestampField(null=False, default=datetime.now())
+        updated_at = pw.TimestampField(null=False, default=datetime.now())
 
         class Meta:
-            table_name = "chat"
-
-    @migrator.create_model
-    class ChatIdTag(pw.Model):
-        id = pw.CharField(max_length=255, unique=True)
-        tag_name = pw.CharField(max_length=255)
-        chat_id = pw.CharField(max_length=255)
-        user_id = pw.CharField(max_length=255)
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "chatidtag"
-
-    @migrator.create_model
-    class Document(pw.Model):
-        id = pw.AutoField()
-        collection_name = pw.CharField(max_length=255, unique=True)
-        name = pw.CharField(max_length=255, unique=True)
-        title = pw.TextField()
-        filename = pw.TextField()
-        content = pw.TextField(null=True)
-        user_id = pw.CharField(max_length=255)
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "document"
-
-    @migrator.create_model
-    class Modelfile(pw.Model):
-        id = pw.AutoField()
-        tag_name = pw.CharField(max_length=255, unique=True)
-        user_id = pw.CharField(max_length=255)
-        modelfile = pw.TextField()
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "modelfile"
-
-    @migrator.create_model
-    class Prompt(pw.Model):
-        id = pw.AutoField()
-        command = pw.CharField(max_length=255, unique=True)
-        user_id = pw.CharField(max_length=255)
-        title = pw.TextField()
-        content = pw.TextField()
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "prompt"
-
-    @migrator.create_model
-    class Tag(pw.Model):
-        id = pw.CharField(max_length=255, unique=True)
-        name = pw.CharField(max_length=255)
-        user_id = pw.CharField(max_length=255)
-        data = pw.TextField(null=True)
-
-        class Meta:
-            table_name = "tag"
-
-    @migrator.create_model
-    class User(pw.Model):
-        id = pw.CharField(max_length=255, unique=True)
-        name = pw.CharField(max_length=255)
-        email = pw.CharField(max_length=255)
-        role = pw.CharField(max_length=255)
-        profile_image_url = pw.TextField()
-        timestamp = pw.BigIntegerField()
-
-        class Meta:
-            table_name = "user"
+            table_name = "message"
 
 
 def rollback(migrator: Migrator, database: pw.Database, *, fake=False):
     """Write your rollback migrations here."""
 
-    migrator.remove_model("user")
+    migrator.remove_model("message")
 
-    migrator.remove_model("tag")
-
-    migrator.remove_model("prompt")
-
-    migrator.remove_model("modelfile")
-
-    migrator.remove_model("document")
-
-    migrator.remove_model("chatidtag")
-
-    migrator.remove_model("chat")
-
-    migrator.remove_model("auth")
+    migrator.remove_model("project")
