@@ -6,7 +6,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from loguru import logger
 
 from configs import app_config, WORK_DIR
-from main import tool_registry
+from main import thread_manager
 
 
 class LLMTest(unittest.TestCase):
@@ -21,13 +21,13 @@ class LLMTest(unittest.TestCase):
         logger.debug("That's it, beautiful and simple logging!")
 
     def test_core_tools(self):
-        functions = tool_registry.get_available_functions()
+        functions = thread_manager.tool_registry.get_available_functions()
         # logger.info(functions)
 
         for name, func in functions.items():
             # Tool(name=,func=,description=)
-            desc = tool_registry.get_tool(name)["schema"].schema["function"]["description"]
-            params = tool_registry.get_tool(name)["schema"].schema["function"]["parameters"]
+            desc = thread_manager.tool_registry.get_tool(name)["schema"].schema["function"]["description"]
+            params = thread_manager.tool_registry.get_tool(name)["schema"].schema["function"]["parameters"]
             tool = Tool(name=name, func=func, description=desc, args_schema=params)
             logger.info(tool)
 

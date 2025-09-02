@@ -53,8 +53,8 @@ def migrate_external(migrator: Migrator, database: pw.Database, *, fake=False):
         account_id = pw.UUIDField(null=False)
         sandbox = pw_pext.BinaryJSONField(default={})
         is_public = pw.BooleanField(default=False)
-        created_at = pw.TimestampField(null=False, default=datetime.now())
-        updated_at = pw.TimestampField(null=False, default=datetime.now())
+        created_at = pw.DateTimeField(null=False, default=datetime.now())
+        updated_at = pw.DateTimeField(null=False, default=datetime.now())
 
         class Meta:
             table_name = "project"
@@ -67,8 +67,8 @@ def migrate_external(migrator: Migrator, database: pw.Database, *, fake=False):
         is_llm_message = pw.BooleanField(null=False, default=True)
         content = pw_pext.BinaryJSONField(default={})
         meta_data = pw_pext.BinaryJSONField(default={})
-        created_at = pw.TimestampField(null=False, default=datetime.now())
-        updated_at = pw.TimestampField(null=False, default=datetime.now())
+        created_at = pw.DateTimeField(null=False, default=datetime.now())
+        updated_at = pw.DateTimeField(null=False, default=datetime.now())
 
         class Meta:
             table_name = "message"

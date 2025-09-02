@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import Optional
 
@@ -23,14 +24,14 @@ class Message(Base):
 
 
 class MessageModel(BaseModel):
-    message_id: str
+    message_id: Optional[str] = None
     thread_id: str
     type: str
     is_llm_message: bool
     content: dict
     meta_data: dict
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -48,7 +49,7 @@ class MessageTable:
                     .order_by(Message.created_at.desc())
                     .first()
                 )
-                return MessageModel.model_validate(message)
+                return MessageModel.model_validate(message) if message else None
         except Exception as e:
             logger.exception("Error getting last message: ", exc_info=e)
             return None
@@ -84,8 +85,8 @@ class MessageTable:
     def save_message(msg: dict):
         try:
             with get_db() as db:
-                message = MessageModel(**msg)
-                db.add(**message.model_dump())
+                message = Message(**{**msg, "message_id": str(uuid.uuid4())})
+                db.add(message)
                 db.commit()
         except Exception as e:
             logger.exception("Error saving message: ", exc_info=e)
