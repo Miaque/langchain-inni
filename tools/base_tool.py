@@ -9,12 +9,16 @@ This module defines the base classes and decorators for creating tools in AgentP
 
 import inspect
 import json
+import sys
 from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Union
 
 from loguru import logger
+
+logger.remove()
+logger.add(sys.stderr, level="INFO")
 
 
 class SchemaType(Enum):

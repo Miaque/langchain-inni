@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from tools.base_tool import BaseTool, ToolResult, openapi_schema, usage_example
 
@@ -52,7 +52,7 @@ This information will help me make sure the cake meets your expectations for the
         </invoke>
         </function_calls>
         """)
-    async def ask(self, text: str, attachments: Optional[Union[str, List[str]]] = None) -> ToolResult:
+    async def ask(self, text: str, attachments: Optional[Union[str, list[str]]] = None) -> ToolResult:
         """Ask the user a question and wait for a response.
 
         Args:
@@ -108,7 +108,7 @@ If you encounter any issues or need to take additional steps, please let me know
         </invoke>
         </function_calls>
         """)
-    async def web_browser_takeover(self, text: str, attachments: Optional[Union[str, List[str]]] = None) -> ToolResult:
+    async def web_browser_takeover(self, text: str, attachments: Optional[Union[str, list[str]]] = None) -> ToolResult:
         """Request user takeover of browser interaction.
 
         Args:
@@ -238,7 +238,7 @@ All deliverables are attached for your review.</parameter>
         </function_calls>
         """)
     async def complete(
-        self, text: Optional[str] = None, attachments: Optional[Union[str, List[str]]] = None
+        self, text: Optional[str] = None, attachments: Optional[Union[str, list[str]]] = None
     ) -> ToolResult:
         """Indicate that the agent has completed all tasks and is entering complete state.
 

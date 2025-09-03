@@ -119,7 +119,7 @@ async def stream_graph_updates(user_input: str, config):
     system_prompt = await get_system_prompt()
     system_prompt = system_prompt.replace("{{current_date}}", get_current_date_info())
 
-    tool_manager = ToolManager(thread_manager, "demo", config["configurable"]["thread_id"])
+    tool_manager = ToolManager(thread_manager, "3545e9c5-5651-426d-a858-6ea4eed1f8a1", config["configurable"]["thread_id"])
     tool_manager.register_all_tools()
 
     async with AsyncPostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
@@ -140,7 +140,7 @@ if __name__ == "__main__":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     async def arun():
-        user_input = "今天是几号，今天福州和厦门的温度谁更高，创建相关的任务"
+        user_input = "回答问题前先仔细思考并创建相关的任务，再根据创建的人物，一步一步执行，获取最后的结果。现在，我的问题是: 今天福州和厦门的温度谁更高？"
         thread_id = str(uuid.uuid4())
         config = {"configurable": {"thread_id": thread_id}}
 
