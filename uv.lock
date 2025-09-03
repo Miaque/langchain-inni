@@ -1029,7 +1029,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
-    { name = "ruff", specifier = ">=0.12.5" },
+    { name = "ruff", specifier = ">=0.12.10" },
 ]
 
 [[package]]

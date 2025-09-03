@@ -57,5 +57,39 @@ class ProjectTable:
             logger.exception("Error updating sandbox: ", exc_info=e)
             return False
 
+    @staticmethod
+    def insert(project: dict) -> ProjectModel:
+        try:
+            with get_db() as db:
+                project = Project(**project)
+                db.add(project)
+                db.commit()
+                return ProjectModel.model_validate(project)
+        except Exception as e:
+            logger.exception("Error saving project: ", exc_info=e)
+            return None
+
+    @staticmethod
+    def update(project_id: str, update_project: dict) -> bool:
+        try:
+            with get_db() as db:
+                update_project = db.query(Project).filter(Project.project_id == project_id).update(update_project)
+                db.commit()
+                return True if update_project == 1 else False
+        except Exception as e:
+            logger.exception("Error updating project: ", exc_info=e)
+            return False
+
+    @staticmethod
+    def delete_by_id(project_id: str) -> bool:
+        try:
+            with get_db() as db:
+                db.query(Project).filter(Project.project_id == project_id).delete()
+                db.commit()
+                return True
+        except Exception as e:
+            logger.exception("Error deleting project by id: ", exc_info=e)
+            return False
+
 
 Projects = ProjectTable()

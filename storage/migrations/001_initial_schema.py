@@ -61,7 +61,7 @@ def migrate_external(migrator: Migrator, database: pw.Database, *, fake=False):
 
     @migrator.create_model
     class Message(pw.Model):
-        message_id = pw.UUIDField(unique=True)
+        message_id = pw.UUIDField(primary_key=True)
         thread_id = pw.UUIDField(null=False)
         type = pw.CharField(null=False)
         is_llm_message = pw.BooleanField(null=False, default=True)
@@ -73,6 +73,15 @@ def migrate_external(migrator: Migrator, database: pw.Database, *, fake=False):
         class Meta:
             table_name = "message"
 
+    @migrator.create_model
+    class Thread(pw.Model):
+        thread_id = pw.UUIDField(primary_key=True)
+        account_id = pw.UUIDField(null=False)
+        project_id = pw.UUIDField(null=False)
+        is_public = pw.BooleanField(default=False)
+        created_at = pw.DateTimeField(null=False, default=datetime.now())
+        updated_at = pw.DateTimeField(null=False, default=datetime.now())
+
 
 def rollback(migrator: Migrator, database: pw.Database, *, fake=False):
     """Write your rollback migrations here."""
@@ -80,3 +89,5 @@ def rollback(migrator: Migrator, database: pw.Database, *, fake=False):
     migrator.remove_model("message")
 
     migrator.remove_model("project")
+
+    migrator.remove_model("thread")

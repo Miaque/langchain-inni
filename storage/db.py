@@ -4,14 +4,14 @@ from typing import Any, Optional
 
 from loguru import logger
 from peewee_migrate import Router
-from sqlalchemy import Dialect, create_engine, MetaData, types
+from sqlalchemy import Dialect, MetaData, create_engine, types
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.pool import QueuePool, NullPool
+from sqlalchemy.pool import NullPool, QueuePool
 from sqlalchemy.sql.type_api import _T
 from typing_extensions import Self
 
-from configs import app_config, WORK_DIR
+from configs import WORK_DIR, app_config
 from storage.wrappers import register_connection
 
 
