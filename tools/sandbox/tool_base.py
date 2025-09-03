@@ -40,7 +40,7 @@ class SandboxToolsBase(BaseTool):
                 if not project:
                     raise ValueError(f"Project {self.project_id} not found")
 
-                sandbox_info = project.get("sandbox") or {}
+                sandbox_info = project.sandbox or {}
 
                 # If there is no sandbox recorded for this project, create one lazily
                 if not sandbox_info.get("id"):

@@ -11,9 +11,9 @@ from storage.db import Base, get_db
 class Thread(Base):
     __tablename__ = "thread"
 
-    thread_id = Column(UUID, primary_key=True, server_default=text("gen_random_uuid()"))
-    account_id = Column(UUID, nullable=False)
-    project_id = Column(UUID, nullable=False)
+    thread_id = Column(UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()"))
+    account_id = Column(UUID(as_uuid=False), nullable=False)
+    project_id = Column(UUID(as_uuid=False), nullable=False)
     is_public = Column(Boolean, nullable=False, default=False)
     created_at = Column(TIMESTAMP, nullable=False, default=text("TIMEZONE('Asia/Shanghai'::text, NOW())"))
     updated_at = Column(TIMESTAMP, nullable=False, default=text("TIMEZONE('Asia/Shanghai'::text, NOW())"))

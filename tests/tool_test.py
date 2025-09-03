@@ -34,6 +34,6 @@ async def test_create_tasks():
 
 @pytest.mark.asyncio
 async def test_create_file():
-    tool = SandboxFilesTool("demo", manager)
+    tool = SandboxFilesTool("34b90f9b-8601-4b29-bf75-497ed8fb924f", manager)
     result = await tool.create_file(file_path="test.txt", file_contents="Hello, world!")
     logger.info("tool result: {}", result)

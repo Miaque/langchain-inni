@@ -13,8 +13,8 @@ from storage.db import Base, get_db
 class Message(Base):
     __tablename__ = "message"
 
-    message_id = Column(UUID, primary_key=True, server_default=text("gen_random_uuid()"))
-    thread_id = Column(UUID, nullable=False)
+    message_id = Column(UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()"))
+    thread_id = Column(UUID(as_uuid=False), nullable=False)
     type = Column(Text, nullable=False)
     is_llm_message = Column(Boolean, nullable=False, default=True)
     content = Column(JSONB, nullable=False)
