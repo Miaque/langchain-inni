@@ -12,8 +12,8 @@ class Thread(Base):
     __tablename__ = "thread"
 
     thread_id = Column(UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()"))
-    account_id = Column(UUID(as_uuid=False), nullable=False)
-    project_id = Column(UUID(as_uuid=False), nullable=False)
+    account_id = Column(UUID(as_uuid=False), nullable=True)
+    project_id = Column(UUID(as_uuid=False), nullable=True)
     is_public = Column(Boolean, nullable=False, default=False)
     created_at = Column(TIMESTAMP, nullable=False, default=text("TIMEZONE('Asia/Shanghai'::text, NOW())"))
     updated_at = Column(TIMESTAMP, nullable=False, default=text("TIMEZONE('Asia/Shanghai'::text, NOW())"))
@@ -21,8 +21,8 @@ class Thread(Base):
 
 class ThreadModel(BaseModel):
     thread_id: str
-    account_id: str
-    project_id: str
+    account_id: Optional[str]
+    project_id: Optional[str]
     is_public: bool
     created_at: datetime
     updated_at: datetime
@@ -41,7 +41,17 @@ class ThreadTable:
                 db.commit()
                 return ThreadModel.model_validate(thread)
         except Exception as e:
-            logger.exception("Error inserting thread: ", exc_info=e)
+            logger.exception("插入线程时出错: ", exc_info=e)
+            return None
+
+    @staticmethod
+    def get_by_id(thread_id: str) -> Optional[ThreadModel]:
+        try:
+            with get_db() as db:
+                thread = db.query(Thread).filter(Thread.thread_id == thread_id).first()
+                return ThreadModel.model_validate(thread) if thread else None
+        except Exception as e:
+            logger.exception("根据ID获取线程时出错: ", exc_info=e)
             return None
 
 

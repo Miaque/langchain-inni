@@ -43,7 +43,7 @@ class ProjectTable:
                 project = db.query(Project).filter(Project.project_id == project_id).first()
                 return ProjectModel.model_validate(project)
         except Exception as e:
-            logger.exception("Error getting project by id: ", exc_info=e)
+            logger.exception("根据ID获取项目时出错: ", exc_info=e)
             return None
 
     @staticmethod
@@ -55,11 +55,11 @@ class ProjectTable:
 
                 return True if result == 1 else False
         except Exception as e:
-            logger.exception("Error updating sandbox: ", exc_info=e)
+            logger.exception("更新沙箱时出错: ", exc_info=e)
             return False
 
     @staticmethod
-    def insert(project: dict) -> ProjectModel:
+    def insert(project: dict) -> Optional[ProjectModel]:
         try:
             with get_db() as db:
                 project = Project(**project)
@@ -67,7 +67,7 @@ class ProjectTable:
                 db.commit()
                 return ProjectModel.model_validate(project)
         except Exception as e:
-            logger.exception("Error saving project: ", exc_info=e)
+            logger.exception("保存项目时出错: ", exc_info=e)
             return None
 
     @staticmethod
@@ -78,7 +78,7 @@ class ProjectTable:
                 db.commit()
                 return True if update_project == 1 else False
         except Exception as e:
-            logger.exception("Error updating project: ", exc_info=e)
+            logger.exception("更新项目时出错: ", exc_info=e)
             return False
 
     @staticmethod
@@ -89,7 +89,7 @@ class ProjectTable:
                 db.commit()
                 return True
         except Exception as e:
-            logger.exception("Error deleting project by id: ", exc_info=e)
+            logger.exception("根据ID删除项目时出错: ", exc_info=e)
             return False
 
 

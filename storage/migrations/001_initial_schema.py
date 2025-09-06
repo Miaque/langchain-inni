@@ -76,8 +76,8 @@ def migrate_external(migrator: Migrator, database: pw.Database, *, fake=False):
     @migrator.create_model
     class Thread(pw.Model):
         thread_id = pw.UUIDField(primary_key=True)
-        account_id = pw.UUIDField(null=False)
-        project_id = pw.UUIDField(null=False)
+        account_id = pw.UUIDField(null=True)
+        project_id = pw.UUIDField(null=True)
         is_public = pw.BooleanField(default=False)
         created_at = pw.DateTimeField(null=False, default=datetime.now())
         updated_at = pw.DateTimeField(null=False, default=datetime.now())

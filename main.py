@@ -1,6 +1,7 @@
 import inspect
 import sys
 import uuid
+from datetime import datetime
 from typing import Annotated, TypedDict
 
 import aiofiles
@@ -112,12 +113,21 @@ async def get_system_prompt() -> str:
     async with aiofiles.open("prompt.md", encoding="utf-8") as f:
         content = await f.read()
 
+    now = datetime.now()
+    datetime_info = f"\n\n=== CURRENT DATE/TIME INFORMATION ===\n"
+    datetime_info += f"Today's date: {now.strftime('%A, %B %d, %Y')}\n"
+    datetime_info += f"Current time: {now.strftime('%H:%M:%S')}\n"
+    datetime_info += f"Current year: {now.strftime('%Y')}\n"
+    datetime_info += f"Current month: {now.strftime('%B')}\n"
+    datetime_info += f"Current day: {now.strftime('%A')}\n"
+    datetime_info += "Use this information for any time-sensitive tasks, research, or when current date/time context is needed.\n"
+    content += datetime_info
+
     return content
 
 
 async def stream_graph_updates(user_input: str, config):
     system_prompt = await get_system_prompt()
-    system_prompt = system_prompt.replace("{{current_date}}", get_current_date_info())
 
     tool_manager = ToolManager(thread_manager, "3545e9c5-5651-426d-a858-6ea4eed1f8a1", config["configurable"]["thread_id"])
     tool_manager.register_all_tools()

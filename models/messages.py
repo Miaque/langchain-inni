@@ -39,6 +39,18 @@ class MessageModel(BaseModel):
 
 class MessageTable:
     @staticmethod
+    def insert(message: dict) -> Optional[MessageModel]:
+        try:
+            with get_db() as db:
+                message = Message(**message)
+                db.add(message)
+                db.commit()
+                return MessageModel.model_validate(message)
+        except Exception as e:
+            logger.info("保存消息时出错", exec_info=e)
+            return None
+
+    @staticmethod
     def get_last_message(thread_id: str, type: str) -> Optional[MessageModel]:
         try:
             with get_db() as db:
@@ -51,7 +63,7 @@ class MessageTable:
                 )
                 return MessageModel.model_validate(message) if message else None
         except Exception as e:
-            logger.exception("Error getting last message: ", exc_info=e)
+            logger.exception("获取最后一条消息时出错: ", exc_info=e)
             return None
 
     @staticmethod
@@ -67,7 +79,7 @@ class MessageTable:
                 )
             return message[0] if message else None
         except Exception as e:
-            logger.exception("Error getting last message id: ", exc_info=e)
+            logger.exception("获取最后一条消息ID时出错: ", exc_info=e)
             return None
 
     @staticmethod
@@ -78,7 +90,7 @@ class MessageTable:
                 db.commit()
                 return True if result == 1 else False
         except Exception as e:
-            logger.exception("Error updating content: ", exc_info=e)
+            logger.exception("更新内容时出错: ", exc_info=e)
             return False
 
     @staticmethod
@@ -89,7 +101,7 @@ class MessageTable:
                 db.add(message)
                 db.commit()
         except Exception as e:
-            logger.exception("Error saving message: ", exc_info=e)
+            logger.exception("保存消息时出错: ", exc_info=e)
             raise e
 
 

@@ -5,7 +5,7 @@ from langchain_text_splitters import SpacyTextSplitter
 from langgraph.checkpoint.postgres import PostgresSaver
 from loguru import logger
 
-from configs import app_config, WORK_DIR
+from configs import WORK_DIR, app_config
 from main import thread_manager
 
 
@@ -40,7 +40,6 @@ class LLMTest(unittest.TestCase):
 
     def test_dir(self):
         logger.info(WORK_DIR)
-
 
 
 if __name__ == "__main__":
