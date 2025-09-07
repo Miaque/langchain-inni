@@ -78,6 +78,7 @@ def get_llm():
         api_key=app_config.api_key,
         custom_llm_provider="openai",
         temperature=0,
+        max_tokens=8192
     )
 
     return llm
@@ -87,15 +88,18 @@ class CoreAgent:
     def __init__(self, thread_manager: ThreadManager):
         self.thread_manager = thread_manager
 
-    async def __call__(self, state: State, config: RunnableConfig):
+    def __call__(self, state: State, config: RunnableConfig):
         llm = get_llm()
         message = llm.invoke(state["messages"])
-        response_generator = await self.thread_manager.response_processor.process_non_streaming_response(
+        response_generator = self.thread_manager.response_processor.process_non_streaming_response(
             message, config["configurable"]["thread_id"]
         )
 
-        async for chunk in response_generator:
-            logger.info("========: {}", chunk)
+        if hasattr(response_generator, "__aiter__"):
+            for chunk in response_generator:
+                logger.info("========: {}", chunk)
+        else:
+            logger.info("========: {}", response_generator)
 
         return {"messages": [message]}
 
