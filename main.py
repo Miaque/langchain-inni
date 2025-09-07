@@ -123,7 +123,7 @@ async def get_system_prompt(thread_manager: ThreadManager) -> str:
     content += datetime_info
 
     if app_config.xml_tool_calling:
-        openapi_schemas = thread_manager.tool_registry.get_available_functions()
+        openapi_schemas = thread_manager.tool_registry.get_openapi_schemas()
         usage_examples = thread_manager.tool_registry.get_usage_examples()
 
         if openapi_schemas:

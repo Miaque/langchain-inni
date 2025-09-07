@@ -1,4 +1,6 @@
+import asyncio
 import sys
+from asyncio import WindowsSelectorEventLoopPolicy
 
 import pytest
 from loguru import logger
@@ -6,6 +8,8 @@ from loguru import logger
 from main import stream_graph_updates
 from thread_manager import ThreadManager
 from tools.tool_manager import ToolManager
+
+asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 logger.remove()  # 先移除默认的控制台输出
 logger.add(sys.stdout, level="INFO")
