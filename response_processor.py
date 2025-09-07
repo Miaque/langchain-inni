@@ -142,8 +142,8 @@ class ResponseProcessor:
         self,
         llm_response: Any,
         thread_id: str,
-        prompt_messages: list[dict[str, Any]],
-        llm_model: str,
+        prompt_messages: Optional[list[dict[str, Any]]] = None,
+        llm_model: Optional[str] = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Process a non-streaming LLM response, handling tool calls and execution.
 
@@ -264,9 +264,7 @@ class ResponseProcessor:
             # --- Execute Tools and Yield Results ---
             tool_calls_to_execute = [item["tool_call"] for item in all_tool_data]
             if app_config.execute_tools and tool_calls_to_execute:
-                logger.debug(
-                    f"使用策略执行 {len(tool_calls_to_execute)} 个工具: {app_config.tool_execution_strategy}"
-                )
+                logger.debug(f"使用策略执行 {len(tool_calls_to_execute)} 个工具: {app_config.tool_execution_strategy}")
                 tool_results = await self._execute_tools(tool_calls_to_execute, app_config.tool_execution_strategy)
 
                 for i, (returned_tool_call, result) in enumerate(tool_results):

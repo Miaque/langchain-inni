@@ -5,6 +5,7 @@ from typing import Annotated, Literal, TypedDict
 
 import aiofiles
 from langchain.tools import StructuredTool
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langchain_litellm import ChatLiteLLM
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -82,13 +83,26 @@ def get_llm():
     return llm
 
 
-def chatbot(state: State):
-    llm = get_llm()
-    return {"messages": [llm.invoke(state["messages"])]}
+class CoreAgent:
+    def __init__(self, thread_manager: ThreadManager):
+        self.thread_manager = thread_manager
+
+    async def __call__(self, state: State, config: RunnableConfig):
+        llm = get_llm()
+        message = llm.invoke(state["messages"])
+        response_generator = await self.thread_manager.response_processor.process_non_streaming_response(
+            message, config["configurable"]["thread_id"]
+        )
+
+        async for chunk in response_generator:
+            logger.info("========: {}", chunk)
+
+        return {"messages": [message]}
 
 
 def get_graph(thread_manager: ThreadManager, checkpointer) -> CompiledStateGraph:
     graph_builder = StateGraph(State)
+    chatbot = CoreAgent(thread_manager=thread_manager)
     graph_builder.add_node("chatbot", chatbot)
 
     tool_manager_node = ToolManagerNode(thread_manager)
