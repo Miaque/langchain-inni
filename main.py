@@ -1,58 +1,61 @@
 import inspect
-import sys
-import uuid
+import json
 from datetime import datetime
-from typing import Annotated, TypedDict
+from typing import Annotated, Literal, TypedDict
 
 import aiofiles
-from langchain.agents import Tool
 from langchain.tools import StructuredTool
 from langchain_core.tools import tool
 from langchain_litellm import ChatLiteLLM
-from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.constants import START
 from langgraph.graph import StateGraph, add_messages
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.prebuilt import tools_condition
 from langgraph.types import interrupt
 from loguru import logger
 
-from configs import app_config
+from configs import WORK_DIR, app_config
 from thread_manager import ThreadManager
-from tools.tool_manager import ToolManager
-from utils.current_date import get_current_date_info
-
-logger.remove()  # 先移除默认的控制台输出
-logger.add(sys.stdout, level="INFO")
-
-thread_manager = ThreadManager()
 
 
-def get_tools() -> list[Tool]:
-    functions = thread_manager.tool_registry.get_available_functions()
-    tools = []
+class State(TypedDict):
+    messages: Annotated[list, add_messages]
+    native_max_auto_continues: int
+    max_iterations: int
+    enable_thinking: bool
+    reasoning_effort: Literal["low", "medium", "high"]
+    llm_max_tokens: int
 
-    for name, func in functions.items():
-        desc = thread_manager.tool_registry.get_tool(name)["schema"].schema["function"]["description"]
-        params = thread_manager.tool_registry.get_tool(name)["schema"].schema["function"]["parameters"]
-        # tool = Tool(name=name, func=func, description=desc, args_schema=params)
 
-        # 创建 StructuredTool，支持异步函数
-        if inspect.iscoroutinefunction(func):
-            tool = StructuredTool.from_function(
-                func=func,
-                name=name,
-                description=desc,
-                args_schema=params,
-                coroutine=func,  # 指定异步函数
-            )
-        else:
-            tool = StructuredTool.from_function(func=func, name=name, description=desc, args_schema=params)
+class ToolManagerNode:
+    def __init__(self, thread_manager: ThreadManager):
+        self.thread_manager = thread_manager
 
-        tools.append(tool)
+    def __call__(self, state: State):
+        functions = self.thread_manager.tool_registry.get_available_functions()
+        tools = []
 
-    return tools
+        for name, func in functions.items():
+            desc = self.thread_manager.tool_registry.get_tool(name)["schema"].schema["function"]["description"]
+            params = self.thread_manager.tool_registry.get_tool(name)["schema"].schema["function"]["parameters"]
+            # tool = Tool(name=name, func=func, description=desc, args_schema=params)
+
+            # 创建 StructuredTool，支持异步函数
+            if inspect.iscoroutinefunction(func):
+                tool = StructuredTool.from_function(
+                    func=func,
+                    name=name,
+                    description=desc,
+                    args_schema=params,
+                    coroutine=func,  # 指定异步函数
+                )
+            else:
+                tool = StructuredTool.from_function(func=func, name=name, description=desc, args_schema=params)
+
+            tools.append(tool)
+
+        return tools
 
 
 @tool
@@ -73,16 +76,10 @@ def get_llm():
         api_base=app_config.base_url,
         api_key=app_config.api_key,
         custom_llm_provider="openai",
+        temperature=0,
     )
 
-    tools = get_tools()
-    llm_with_tools = llm.bind_tools(tools)
-
-    return llm_with_tools
-
-
-class State(TypedDict):
-    messages: Annotated[list, add_messages]
+    return llm
 
 
 def chatbot(state: State):
@@ -90,12 +87,12 @@ def chatbot(state: State):
     return {"messages": [llm.invoke(state["messages"])]}
 
 
-def get_graph(checkpointer) -> CompiledStateGraph:
+def get_graph(thread_manager: ThreadManager, checkpointer) -> CompiledStateGraph:
     graph_builder = StateGraph(State)
     graph_builder.add_node("chatbot", chatbot)
 
-    tool_node = ToolNode(tools=get_tools())
-    graph_builder.add_node("tools", tool_node)
+    tool_manager_node = ToolManagerNode(thread_manager)
+    graph_builder.add_node("tools", tool_manager_node)
 
     graph_builder.add_conditional_edges(
         "chatbot",
@@ -109,62 +106,86 @@ def get_graph(checkpointer) -> CompiledStateGraph:
     return graph
 
 
-async def get_system_prompt() -> str:
-    async with aiofiles.open("prompt.md", encoding="utf-8") as f:
+async def get_system_prompt(thread_manager: ThreadManager) -> str:
+    async with aiofiles.open(WORK_DIR / "prompt.md", encoding="utf-8") as f:
         content = await f.read()
 
     now = datetime.now()
-    datetime_info = f"\n\n=== CURRENT DATE/TIME INFORMATION ===\n"
+    datetime_info = "\n\n=== CURRENT DATE/TIME INFORMATION ===\n"
     datetime_info += f"Today's date: {now.strftime('%A, %B %d, %Y')}\n"
     datetime_info += f"Current time: {now.strftime('%H:%M:%S')}\n"
     datetime_info += f"Current year: {now.strftime('%Y')}\n"
     datetime_info += f"Current month: {now.strftime('%B')}\n"
     datetime_info += f"Current day: {now.strftime('%A')}\n"
-    datetime_info += "Use this information for any time-sensitive tasks, research, or when current date/time context is needed.\n"
+    datetime_info += (
+        "Use this information for any time-sensitive tasks, research, or when current date/time context is needed.\n"
+    )
     content += datetime_info
+
+    if app_config.xml_tool_calling:
+        openapi_schemas = thread_manager.tool_registry.get_available_functions()
+        usage_examples = thread_manager.tool_registry.get_usage_examples()
+
+        if openapi_schemas:
+            # Convert schemas to JSON string
+            schemas_json = json.dumps(openapi_schemas, indent=2)
+
+            # Build usage examples section if any exist
+            usage_examples_section = ""
+            if usage_examples:
+                usage_examples_section = "\n\nUsage Examples:\n"
+                for func_name, example in usage_examples.items():
+                    usage_examples_section += f"\n{func_name}:\n{example}\n"
+
+            examples_content = f"""
+        In this environment you have access to a set of tools you can use to answer the user's question.
+
+        You can invoke functions by writing a <function_calls> block like the following as part of your reply to the user:
+
+        <function_calls>
+        <invoke name="function_name">
+        <parameter name="param_name">param_value</parameter>
+        ...
+        </invoke>
+        </function_calls>
+
+        String and scalar parameters should be specified as-is, while lists and objects should use JSON format.
+
+        Here are the functions available in JSON Schema format:
+
+        ```json
+        {schemas_json}
+        ```
+
+        When using the tools:
+        - Use the exact function names from the JSON schema above
+        - Include all required parameters as specified in the schema
+        - Format complex data (objects, arrays) as JSON strings within the parameter tags
+        - Boolean values should be "true" or "false" (lowercase)
+        {usage_examples_section}"""
+
+            content += examples_content
 
     return content
 
 
-async def stream_graph_updates(user_input: str, config):
-    system_prompt = await get_system_prompt()
-
-    tool_manager = ToolManager(thread_manager, "3545e9c5-5651-426d-a858-6ea4eed1f8a1", config["configurable"]["thread_id"])
-    tool_manager.register_all_tools()
+async def stream_graph_updates(user_input: str, thread_manager: ThreadManager, config):
+    system_prompt = await get_system_prompt(thread_manager)
 
     async with AsyncPostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
-        graph = get_graph(checkpointer)
+        graph = get_graph(thread_manager, checkpointer)
 
         async for event in graph.astream(
-            {"messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_input}]},
+            {
+                "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_input}],
+                "native_max_auto_continues": 25,
+                "max_iterations": 100,
+                "enable_thinking": True,
+                "reasoning_effort": "low",
+                "llm_max_tokens": 8192,
+            },
             config,
             stream_mode="values",
         ):
             if "messages" in event:
                 logger.info(event["messages"][-1].pretty_print())
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-    async def arun():
-        user_input = "回答问题前先仔细思考并创建相关的任务，再根据创建的人物，一步一步执行，获取最后的结果。现在，我的问题是: 今天福州和厦门的温度谁更高？"
-        thread_id = str(uuid.uuid4())
-        config = {"configurable": {"thread_id": thread_id}}
-
-        await stream_graph_updates(user_input, config)
-
-    # def get_history_state():
-    #     config = {"configurable": {"thread_id": "1", "checkpoint_id": "1f084048-2825-6f93-8004-484a5e04f341"}}
-    #
-    #     with PostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
-    #         graph = get_graph(checkpointer)
-    #
-    #         state = graph.get_state(config)
-    #         logger.info(state)
-
-    asyncio.run(arun())
-
-    # get_history_state()

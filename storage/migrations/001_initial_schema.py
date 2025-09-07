@@ -48,7 +48,7 @@ def migrate(migrator: Migrator, database: pw.Database, *, fake=False):
 def migrate_external(migrator: Migrator, database: pw.Database, *, fake=False):
     @migrator.create_model
     class Project(pw.Model):
-        project_id = pw.UUIDField(primary_key=True)
+        project_id = pw.UUIDField(primary_key=True, constraints=[pw.SQL("DEFAULT gen_random_uuid()")])
         name = pw.CharField(null=False)
         account_id = pw.UUIDField(null=False)
         sandbox = pw_pext.BinaryJSONField(default={})
@@ -61,7 +61,7 @@ def migrate_external(migrator: Migrator, database: pw.Database, *, fake=False):
 
     @migrator.create_model
     class Message(pw.Model):
-        message_id = pw.UUIDField(primary_key=True)
+        message_id = pw.UUIDField(primary_key=True, constraints=[pw.SQL("DEFAULT gen_random_uuid()")])
         thread_id = pw.UUIDField(null=False)
         type = pw.CharField(null=False)
         is_llm_message = pw.BooleanField(null=False, default=True)
@@ -75,7 +75,7 @@ def migrate_external(migrator: Migrator, database: pw.Database, *, fake=False):
 
     @migrator.create_model
     class Thread(pw.Model):
-        thread_id = pw.UUIDField(primary_key=True)
+        thread_id = pw.UUIDField(primary_key=True, constraints=[pw.SQL("DEFAULT gen_random_uuid()")])
         account_id = pw.UUIDField(null=True)
         project_id = pw.UUIDField(null=True)
         is_public = pw.BooleanField(default=False)

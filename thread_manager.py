@@ -28,7 +28,7 @@ class ThreadManager:
         account_id: Optional[str] = None,
         project_id: Optional[str] = None,
         is_public: bool = False,
-        metadata: Optional[dict[str, any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> str:
         """在数据库中创建新线程。
 
@@ -67,7 +67,7 @@ class ThreadManager:
                 return thread_id
             else:
                 logger.error(
-                    f"线程创建失败或未返回预期的数据结构。结果数据: {result.data}"
+                    f"线程创建失败或未返回预期的数据结构。结果数据: {result}"
                 )
                 raise Exception("Failed to create thread: no thread_id returned")
 
@@ -102,7 +102,6 @@ class ThreadManager:
         logger.debug(
             f"正在向线程 {thread_id} 添加类型为 '{type}' 的消息 (agent: {agent_id}, version: {agent_version_id})"
         )
-        client = await self.db.client
 
         # 准备插入数据
         data_to_insert = {

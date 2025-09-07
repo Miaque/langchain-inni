@@ -17,7 +17,11 @@
     "files.exclude": {
         "**/__pycache__": true,
         ".idea": true,
-        ".pytest_cache": true,
+        "**/.pytest_cache": true,
         ".history": true,
     },
+    "cursorpyright.analysis.autoImportCompletions": true,
+    "cursorpyright.analysis.extraPaths": [
+        "${workspaceFolder}"
+    ],
 }
