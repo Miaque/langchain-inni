@@ -815,7 +815,7 @@ class ResponseProcessor:
                 # The DB has the rich content in metadata.frontend_content.
                 # Let's reconstruct the message for yielding.
                 message_for_yield = message_obj.copy()
-                message_for_yield["content"] = structured_result_for_frontend
+                message_for_yield.content = structured_result_for_frontend
                 return message_for_yield
 
             return message_obj  # Return the modified message object
