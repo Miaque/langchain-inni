@@ -139,7 +139,7 @@ class ThreadManager:
                             f"处理消息 {saved_message.message_id} 的积分使用错误:",
                             exc_info=billing_e,
                         )
-                return saved_message
+                return saved_message.model_dump()
             else:
                 logger.error(
                     "插入操作失败或未为线程 {} 返回预期的数据结构。结果数据: {}",

@@ -265,7 +265,7 @@ class ResponseProcessor:
                     original_data = all_tool_data[i]
                     tool_call_from_data = original_data["tool_call"]
                     parsing_details = original_data["parsing_details"]
-                    current_assistant_id = assistant_message_object.message_id if assistant_message_object else None
+                    current_assistant_id = assistant_message_object['message_id'] if assistant_message_object else None
 
                     context = self._create_tool_context(
                         tool_call_from_data, tool_index, current_assistant_id, parsing_details
@@ -290,7 +290,7 @@ class ResponseProcessor:
                     # Save and Yield completed/failed status
                     completed_msg_obj = await self._yield_and_save_tool_completed(
                         context,
-                        saved_tool_result_object.message_id if saved_tool_result_object else None,
+                        saved_tool_result_object['message_id'] if saved_tool_result_object else None,
                         thread_id,
                         thread_run_id,
                     )
@@ -815,7 +815,7 @@ class ResponseProcessor:
                 # The DB has the rich content in metadata.frontend_content.
                 # Let's reconstruct the message for yielding.
                 message_for_yield = message_obj.copy()
-                message_for_yield.content = structured_result_for_frontend
+                message_for_yield['content'] = structured_result_for_frontend
                 return message_for_yield
 
             return message_obj  # Return the modified message object
