@@ -9,6 +9,7 @@ from loguru import logger
 
 from configs import app_config
 from configs.processor_config import ToolExecutionStrategy, XmlAddingStrategy
+from models.messages import MessageModel
 from tools.base_tool import ToolResult
 from tools.tool_registry import ToolRegistry
 from utils.json_helpers import format_for_yield, safe_json_parse, to_json_string
@@ -179,59 +180,52 @@ class ResponseProcessor:
                 yield format_for_yield(start_msg_obj)
 
             # Extract finish_reason, content, tool calls
-            if hasattr(llm_response, "choices") and llm_response.choices:
-                if hasattr(llm_response.choices[0], "finish_reason"):
-                    finish_reason = llm_response.choices[0].finish_reason
+            if hasattr(llm_response, "response_metadata") and llm_response.response_metadata:
+                if "finish_reason" in llm_response.response_metadata:
+                    finish_reason = llm_response.response_metadata["finish_reason"]
                     logger.debug(f"非流式finish_reason: {finish_reason}")
-                response_message = (
-                    llm_response.choices[0].message if hasattr(llm_response.choices[0], "message") else None
-                )
-                if response_message:
-                    if hasattr(response_message, "content") and response_message.content:
-                        content = response_message.content
-                        if app_config.xml_tool_calling:
-                            parsed_xml_data = self._parse_xml_tool_calls(content)
-                            if 0 < app_config.max_xml_tool_calls < len(parsed_xml_data):
-                                # Truncate content and tool data if limit exceeded
-                                # ... (Truncation logic similar to streaming) ...
-                                if parsed_xml_data:
-                                    xml_chunks = self._extract_xml_chunks(content)[: app_config.max_xml_tool_calls]
-                                    if xml_chunks:
-                                        last_chunk = xml_chunks[-1]
-                                        last_chunk_pos = content.find(last_chunk)
-                                        if last_chunk_pos >= 0:
-                                            content = content[: last_chunk_pos + len(last_chunk)]
-                                parsed_xml_data = parsed_xml_data[: app_config.max_xml_tool_calls]
-                                finish_reason = "xml_tool_limit_reached"
-                            all_tool_data.extend(parsed_xml_data)
 
-                    if (
-                        app_config.native_tool_calling
-                        and hasattr(response_message, "tool_calls")
-                        and response_message.tool_calls
-                    ):
-                        for tool_call in response_message.tool_calls:
-                            if hasattr(tool_call, "function"):
-                                exec_tool_call = {
-                                    "function_name": tool_call.function.name,
-                                    "arguments": safe_json_parse(tool_call.function.arguments)
-                                    if isinstance(tool_call.function.arguments, str)
-                                    else tool_call.function.arguments,
-                                    "id": tool_call.id if hasattr(tool_call, "id") else str(uuid.uuid4()),
+                if hasattr(llm_response, "content") and llm_response.content:
+                    content = llm_response.content
+                    if app_config.xml_tool_calling:
+                        parsed_xml_data = self._parse_xml_tool_calls(content)
+                        if 0 < app_config.max_xml_tool_calls < len(parsed_xml_data):
+                            # Truncate content and tool data if limit exceeded
+                            # ... (Truncation logic similar to streaming) ...
+                            if parsed_xml_data:
+                                xml_chunks = self._extract_xml_chunks(content)[: app_config.max_xml_tool_calls]
+                                if xml_chunks:
+                                    last_chunk = xml_chunks[-1]
+                                    last_chunk_pos = content.find(last_chunk)
+                                    if last_chunk_pos >= 0:
+                                        content = content[: last_chunk_pos + len(last_chunk)]
+                            parsed_xml_data = parsed_xml_data[: app_config.max_xml_tool_calls]
+                            finish_reason = "xml_tool_limit_reached"
+                        all_tool_data.extend(parsed_xml_data)
+
+                if app_config.native_tool_calling and hasattr(llm_response, "tool_calls") and llm_response.tool_calls:
+                    for tool_call in llm_response.tool_calls:
+                        if hasattr(tool_call, "function"):
+                            exec_tool_call = {
+                                "function_name": tool_call.function.name,
+                                "arguments": safe_json_parse(tool_call.function.arguments)
+                                if isinstance(tool_call.function.arguments, str)
+                                else tool_call.function.arguments,
+                                "id": tool_call.id if hasattr(tool_call, "id") else str(uuid.uuid4()),
+                            }
+                            all_tool_data.append({"tool_call": exec_tool_call, "parsing_details": None})
+                            native_tool_calls_for_message.append(
+                                {
+                                    "id": exec_tool_call["id"],
+                                    "type": "function",
+                                    "function": {
+                                        "name": tool_call.function.name,
+                                        "arguments": tool_call.function.arguments
+                                        if isinstance(tool_call.function.arguments, str)
+                                        else to_json_string(tool_call.function.arguments),
+                                    },
                                 }
-                                all_tool_data.append({"tool_call": exec_tool_call, "parsing_details": None})
-                                native_tool_calls_for_message.append(
-                                    {
-                                        "id": exec_tool_call["id"],
-                                        "type": "function",
-                                        "function": {
-                                            "name": tool_call.function.name,
-                                            "arguments": tool_call.function.arguments
-                                            if isinstance(tool_call.function.arguments, str)
-                                            else to_json_string(tool_call.function.arguments),
-                                        },
-                                    }
-                                )
+                            )
 
             # --- SAVE and YIELD Final Assistant Message ---
             message_data = {
@@ -271,7 +265,7 @@ class ResponseProcessor:
                     original_data = all_tool_data[i]
                     tool_call_from_data = original_data["tool_call"]
                     parsing_details = original_data["parsing_details"]
-                    current_assistant_id = assistant_message_object["message_id"] if assistant_message_object else None
+                    current_assistant_id = assistant_message_object.message_id if assistant_message_object else None
 
                     context = self._create_tool_context(
                         tool_call_from_data, tool_index, current_assistant_id, parsing_details
@@ -296,7 +290,7 @@ class ResponseProcessor:
                     # Save and Yield completed/failed status
                     completed_msg_obj = await self._yield_and_save_tool_completed(
                         context,
-                        saved_tool_result_object["message_id"] if saved_tool_result_object else None,
+                        saved_tool_result_object.message_id if saved_tool_result_object else None,
                         thread_id,
                         thread_run_id,
                     )
@@ -826,7 +820,7 @@ class ResponseProcessor:
 
             return message_obj  # Return the modified message object
         except Exception as e:
-            logger.error(f"Error adding tool result: {str(e)}", exc_info=True)
+            logger.error(f"Error adding tool result: {str(e)}", exc_info=e)
             # Fallback to a simple message
             try:
                 fallback_message = {"role": "user", "content": str(result)}
@@ -839,7 +833,7 @@ class ResponseProcessor:
                 )
                 return message_obj  # Return the full message object
             except Exception as e2:
-                logger.error(f"Failed even with fallback message: {str(e2)}", exc_info=True)
+                logger.error(f"Failed even with fallback message: {str(e2)}", exc_info=e2)
                 return None  # Return None on error
 
     @staticmethod

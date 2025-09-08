@@ -1,15 +1,15 @@
-import asyncio
 import sys
-from asyncio import WindowsSelectorEventLoopPolicy
 
 import pytest
+from langgraph.checkpoint.postgres import PostgresSaver
 from loguru import logger
 
+from configs import app_config
 from main import stream_graph_updates
 from thread_manager import ThreadManager
 from tools.tool_manager import ToolManager
 
-asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
+# asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 logger.remove()  # 先移除默认的控制台输出
 logger.add(sys.stdout, level="INFO")
@@ -33,3 +33,9 @@ async def test_run():
     )
 
     await stream_graph_updates(message, thread_manager, config)
+
+
+@pytest.mark.asyncio
+async def test_setup_checkpoint():
+    with PostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
+        checkpointer.setup()

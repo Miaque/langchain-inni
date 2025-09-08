@@ -8,6 +8,8 @@ from langchain.tools import StructuredTool
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langchain_litellm import ChatLiteLLM
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.constants import START
 from langgraph.graph import StateGraph, add_messages
@@ -78,7 +80,7 @@ def get_llm():
         api_key=app_config.api_key,
         custom_llm_provider="openai",
         temperature=0,
-        max_tokens=8192
+        max_tokens=8192,
     )
 
     return llm
@@ -88,7 +90,7 @@ class CoreAgent:
     def __init__(self, thread_manager: ThreadManager):
         self.thread_manager = thread_manager
 
-    def __call__(self, state: State, config: RunnableConfig):
+    async def __call__(self, state: State, config: RunnableConfig):
         llm = get_llm()
         message = llm.invoke(state["messages"])
         response_generator = self.thread_manager.response_processor.process_non_streaming_response(
@@ -96,7 +98,7 @@ class CoreAgent:
         )
 
         if hasattr(response_generator, "__aiter__"):
-            for chunk in response_generator:
+            async for chunk in response_generator:
                 logger.info("========: {}", chunk)
         else:
             logger.info("========: {}", response_generator)
@@ -104,7 +106,7 @@ class CoreAgent:
         return {"messages": [message]}
 
 
-def get_graph(thread_manager: ThreadManager, checkpointer) -> CompiledStateGraph:
+def get_graph(thread_manager: ThreadManager, checkpointer=None) -> CompiledStateGraph:
     graph_builder = StateGraph(State)
     chatbot = CoreAgent(thread_manager=thread_manager)
     graph_builder.add_node("chatbot", chatbot)
@@ -120,7 +122,7 @@ def get_graph(thread_manager: ThreadManager, checkpointer) -> CompiledStateGraph
     graph_builder.add_edge("tools", "chatbot")
     graph_builder.add_edge(START, "chatbot")
 
-    graph = graph_builder.compile(checkpointer=checkpointer)
+    graph = graph_builder.compile(checkpointer=checkpointer) if checkpointer else graph_builder.compile()
     return graph
 
 
@@ -190,8 +192,9 @@ async def get_system_prompt(thread_manager: ThreadManager) -> str:
 async def stream_graph_updates(user_input: str, thread_manager: ThreadManager, config):
     system_prompt = await get_system_prompt(thread_manager)
 
-    async with AsyncPostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
-        graph = get_graph(thread_manager, checkpointer)
+    # async with AsyncPostgresSaver.from_conn_string(app_config.SQLALCHEMY_DATABASE_URI) as checkpointer:
+    with InMemorySaver() as checkpointer:
+        graph = get_graph(thread_manager)
 
         async for event in graph.astream(
             {
