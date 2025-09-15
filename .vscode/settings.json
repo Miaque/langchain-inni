@@ -25,7 +25,8 @@
         "${workspaceFolder}"
     ],
     "python.testing.pytestArgs": [
-        "tests"
+        "tests",
+        "-s"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
