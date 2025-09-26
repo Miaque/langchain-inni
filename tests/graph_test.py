@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated, TypedDict
 
 import pytest
@@ -9,6 +10,7 @@ from loguru import logger
 
 from configs import app_config
 from graph import graph_builder
+from llm import get_llm, langfuse_handler
 
 
 def test_graph_init():
@@ -72,12 +74,13 @@ def test_graph_history():
                 event["messages"][-1].pretty_print()
 
 
-def test_subgraph():
+@pytest.mark.asyncio
+async def test_subgraph():
     class SubgraphMessagesState(TypedDict):
         subgraph_messages: Annotated[list, add_messages]
 
-    def call_model(state: SubgraphMessagesState):
-        response = llm.invoke(state["subgraph_messages"])
+    async def call_model(state: SubgraphMessagesState):
+        response = await get_llm().ainvoke(state["subgraph_messages"])
         return {"subgraph_messages": response}
 
     subgraph_builder = StateGraph(SubgraphMessagesState)
@@ -86,6 +89,22 @@ def test_subgraph():
 
     subgraph = subgraph_builder.compile()
 
-    def call_subgraph(state: MessagesState):
-        response = subgraph.invoke({"subgraph_messages": state["messages"]})
+    async def call_subgraph(state: MessagesState):
+        response = await subgraph.ainvoke({"subgraph_messages": state["messages"]})
         return {"messages": response["subgraph_messages"]}
+
+    builder = StateGraph(MessagesState)
+    builder.add_node("subgraph_node", call_subgraph)
+    builder.add_edge(START, "subgraph_node")
+    graph = builder.compile()
+
+    thread_id = str(uuid.uuid4())
+    response = await graph.ainvoke(
+        input={"messages": [{"role": "user", "content": "你好，你是谁？"}]},
+        config={
+            "callbacks": [langfuse_handler],
+            "configurable": {"thread_id": thread_id},
+            "metadata": {"langfuse_session_id": thread_id, "langfuse_user_id": "admin"},
+        },
+    )
+    logger.info(response)

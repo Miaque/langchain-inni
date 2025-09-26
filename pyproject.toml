@@ -29,6 +29,7 @@ dependencies = [
     "peewee>=3.18.2",
     "peewee-migrate>=1.13.0",
     "langchain-deepseek>=0.1.4",
+    "langfuse>=3.5.1",
 ]
 
 [dependency-groups]

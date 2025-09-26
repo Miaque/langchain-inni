@@ -7,7 +7,6 @@ import aiofiles
 from langchain.tools import StructuredTool
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from langchain_litellm import ChatLiteLLM
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -19,6 +18,7 @@ from langgraph.types import interrupt
 from loguru import logger
 
 from configs import WORK_DIR, app_config
+from llm import get_reason_llm
 from thread_manager import ThreadManager
 
 
@@ -73,25 +73,12 @@ def human_assistance(query: str) -> str:
 # tools = [tool, human_assistance] + get_core_tools()
 
 
-def get_llm():
-    llm = ChatLiteLLM(
-        model=app_config.MODEL_NAME,
-        api_base=app_config.BASE_URL,
-        api_key=app_config.API_KEY,
-        custom_llm_provider="openai",
-        temperature=0,
-        max_tokens=8192,
-    )
-
-    return llm
-
-
 class CoreAgent:
     def __init__(self, thread_manager: ThreadManager):
         self.thread_manager = thread_manager
 
     async def __call__(self, state: State, config: RunnableConfig):
-        llm = get_llm()
+        llm = get_reason_llm()
         message = llm.invoke(state["messages"])
         response_generator = self.thread_manager.response_processor.process_non_streaming_response(
             message, config["configurable"]["thread_id"]

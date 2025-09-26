@@ -1,25 +1,14 @@
 from typing import Annotated
 
 from langchain_core.tools import tool
-from langchain_litellm import ChatLiteLLM
 from langchain_tavily import TavilySearch
-from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import interrupt
 from typing_extensions import TypedDict
 
-from configs import app_config
-
-llm = ChatLiteLLM(
-    model=app_config.MODEL_NAME,
-    api_base=app_config.BASE_URL,
-    api_key=app_config.API_KEY,
-    custom_llm_provider="openai",
-    temperature=0,
-    max_tokens=8192,
-)
+from llm import get_llm
 
 
 class State(TypedDict):
@@ -38,7 +27,7 @@ def human_assistance(query: str) -> str:
 
 tool = TavilySearch(max_results=2)
 tools = [tool, human_assistance]
-llm_with_tools = llm.bind_tools(tools)
+llm_with_tools = get_llm().bind_tools(tools)
 
 
 def chatbot(state: State):
