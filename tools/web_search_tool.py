@@ -23,9 +23,9 @@ class SandboxWebSearchTool(SandboxToolsBase):
         # Load environment variables
         load_dotenv()
         # Use API keys from config
-        self.tavily_api_key = app_config.tavily_api_key
-        self.firecrawl_api_key = app_config.firecrawl_api_key
-        self.firecrawl_url = app_config.firecrawl_url
+        self.tavily_api_key = app_config.TAVILY_API_KEY
+        self.firecrawl_api_key = app_config.FIRECRAWL_API_KEY
+        self.firecrawl_url = app_config.FIRECRAWL_URL
 
         if not self.tavily_api_key:
             raise ValueError("TAVILY_API_KEY not found in configuration")

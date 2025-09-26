@@ -15,9 +15,9 @@ from configs import app_config
 
 logger.debug("Initializing Daytona sandbox configuration")
 daytona_config = DaytonaConfig(
-    api_key=app_config.daytona_api_key,
-    api_url=app_config.daytona_api_url,
-    target=app_config.daytona_target,
+    api_key=app_config.DAYTONA_API_KEY,
+    api_url=app_config.DAYTONA_API_URL,
+    target=app_config.DAYTONA_TARGET,
 )
 
 if daytona_config.api_key:
@@ -102,7 +102,7 @@ async def create_sandbox(password: str, project_id: Optional[str] = None) -> Asy
         labels = {"id": project_id}
 
     params = CreateSandboxFromSnapshotParams(
-        snapshot=app_config.daytona_snapshot_name,
+        snapshot=app_config.DAYTONA_SNAPSHOT_NAME,
         public=True,
         labels=labels,
         env_vars={

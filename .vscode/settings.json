@@ -7,13 +7,7 @@
     ],
     "python.analysis.indexing": true,
     "python.analysis.autoImportCompletions": true,
-    "python.analysis.packageIndexDepths": [
-        {
-            "name": "",
-            "depth": 100,
-            "includeAllSymbols": true
-        }
-    ],
+    "python.analysis.packageIndexDepths": [["",20, true]],
     "files.exclude": {
         "**/__pycache__": true,
         ".idea": true,
@@ -30,4 +24,5 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
+    "python.analysis.typeCheckingMode": "basic",
 }

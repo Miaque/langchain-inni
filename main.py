@@ -75,9 +75,9 @@ def human_assistance(query: str) -> str:
 
 def get_llm():
     llm = ChatLiteLLM(
-        model=app_config.model_name,
-        api_base=app_config.base_url,
-        api_key=app_config.api_key,
+        model=app_config.MODEL_NAME,
+        api_base=app_config.BASE_URL,
+        api_key=app_config.API_KEY,
         custom_llm_provider="openai",
         temperature=0,
         max_tokens=8192,
@@ -142,7 +142,7 @@ async def get_system_prompt(thread_manager: ThreadManager) -> str:
     )
     content += datetime_info
 
-    if app_config.xml_tool_calling:
+    if app_config.XML_TOOL_CALLING:
         openapi_schemas = thread_manager.tool_registry.get_openapi_schemas()
         usage_examples = thread_manager.tool_registry.get_usage_examples()
 

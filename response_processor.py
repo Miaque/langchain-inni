@@ -187,23 +187,23 @@ class ResponseProcessor:
 
                 if hasattr(llm_response, "content") and llm_response.content:
                     content = llm_response.content
-                    if app_config.xml_tool_calling:
+                    if app_config.XML_TOOL_CALLING:
                         parsed_xml_data = self._parse_xml_tool_calls(content)
-                        if 0 < app_config.max_xml_tool_calls < len(parsed_xml_data):
+                        if 0 < app_config.MAX_XML_TOOL_CALLS < len(parsed_xml_data):
                             # Truncate content and tool data if limit exceeded
                             # ... (Truncation logic similar to streaming) ...
                             if parsed_xml_data:
-                                xml_chunks = self._extract_xml_chunks(content)[: app_config.max_xml_tool_calls]
+                                xml_chunks = self._extract_xml_chunks(content)[: app_config.MAX_XML_TOOL_CALLS]
                                 if xml_chunks:
                                     last_chunk = xml_chunks[-1]
                                     last_chunk_pos = content.find(last_chunk)
                                     if last_chunk_pos >= 0:
                                         content = content[: last_chunk_pos + len(last_chunk)]
-                            parsed_xml_data = parsed_xml_data[: app_config.max_xml_tool_calls]
+                            parsed_xml_data = parsed_xml_data[: app_config.MAX_XML_TOOL_CALLS]
                             finish_reason = "xml_tool_limit_reached"
                         all_tool_data.extend(parsed_xml_data)
 
-                if app_config.native_tool_calling and hasattr(llm_response, "tool_calls") and llm_response.tool_calls:
+                if app_config.NATIVE_TOOL_CALLING and hasattr(llm_response, "tool_calls") and llm_response.tool_calls:
                     for tool_call in llm_response.tool_calls:
                         if hasattr(tool_call, "function"):
                             exec_tool_call = {
@@ -257,9 +257,9 @@ class ResponseProcessor:
 
             # --- Execute Tools and Yield Results ---
             tool_calls_to_execute = [item["tool_call"] for item in all_tool_data]
-            if app_config.execute_tools and tool_calls_to_execute:
-                logger.debug(f"使用策略执行 {len(tool_calls_to_execute)} 个工具: {app_config.tool_execution_strategy}")
-                tool_results = await self._execute_tools(tool_calls_to_execute, app_config.tool_execution_strategy)
+            if app_config.EXECUTE_TOOLS and tool_calls_to_execute:
+                logger.debug(f"使用策略执行 {len(tool_calls_to_execute)} 个工具: {app_config.TOOL_EXECUTION_STRATEGY}")
+                tool_results = await self._execute_tools(tool_calls_to_execute, app_config.TOOL_EXECUTION_STRATEGY)
 
                 for i, (returned_tool_call, result) in enumerate(tool_results):
                     original_data = all_tool_data[i]
@@ -282,7 +282,7 @@ class ResponseProcessor:
                         thread_id,
                         tool_call_from_data,
                         result,
-                        app_config.xml_adding_strategy,
+                        app_config.XML_ADDING_STRATEGY,
                         current_assistant_id,
                         parsing_details,
                     )
